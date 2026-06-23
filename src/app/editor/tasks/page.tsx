@@ -1,15 +1,11 @@
+'use client';
+
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { Button } from '@/components/Button';
 import { MetricCard } from '@/components/MetricCard';
 import { StatusPill } from '@/components/StatusPill';
-
-const navItems = [
-  { href: '/calendar', label: 'Content Calendar' },
-  { href: '/review/content-scaling-mistakes', label: 'Client Reviews' },
-  { href: '/internal/review-queue', label: 'Internal Queue' },
-  { href: '/editor/tasks', label: 'Editor Tasks', active: true },
-];
+import { useAuth } from '@/lib/auth-context';
 
 const editorMetrics = [
   { label: 'Assigned', value: '8' },
@@ -25,8 +21,10 @@ const tasks = [
 ];
 
 export default function EditorTasksPage() {
+  const { role } = useAuth();
+
   return (
-    <AppShell sectionLabel="Editor Portal" navItems={navItems} sideTitle="Editor view" sideCopy="Editors should only see assigned work, raw footage links, notes, deadlines, amendment comments, and upload/submission actions.">
+    <AppShell sectionLabel="Editor Portal" navItems={[]} sideTitle="Editor view" sideCopy="Editors should only see assigned work, raw footage links, notes, deadlines, amendment comments, and upload/submission actions." role={role}>
       <div className="topbar">
         <div className="crumb">Editor Portal / <b>My Tasks</b></div>
         <div className="top-actions"><Button>Upload output</Button><Button variant="primary">Submit selected</Button></div>
@@ -36,7 +34,7 @@ export default function EditorTasksPage() {
         <div className="summary">{editorMetrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}</div>
       </section>
       <section className="panel task-table-panel">
-        <div className="panel-head"><h2>Assigned edits</h2><Button>Filter by due date</Button></div>
+        <div className="panel-head"><h2>Assigned edits</h2><Button>Filter by status</Button></div>
         <div className="task-table">
           <div className="task-row header-row"><span>Content</span><span>Status</span><span>Resources</span><span>Due</span><span>Action</span></div>
           {tasks.map((task) => (

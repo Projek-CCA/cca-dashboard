@@ -1,7 +1,7 @@
 -- CCA Dashboard Supabase/PostgreSQL schema draft v0.1
 -- This is not applied yet. It documents the target database shape for the real build.
 
-create type app_role as enum ('client', 'admin', 'producer', 'qc', 'editor');
+create type app_role as enum ('client', 'admin', 'project_manager', 'qc', 'editor');
 create type content_status as enum ('idea', 'shoot', 'editing', 'pending_qc', 'pending_client_approval', 'amendments_requested', 'pending_hook_caption', 'ready_to_post', 'posted');
 create type assignment_status as enum ('assigned', 'in_progress', 'submitted', 'needs_revision', 'accepted');
 create type comment_visibility as enum ('client_visible', 'cca_internal_only', 'editor_visible_amendment');
