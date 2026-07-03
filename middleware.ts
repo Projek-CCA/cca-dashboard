@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 const protectedRoutes = ['/dashboard', '/internal', '/editor', '/qc'];
-const publicRoutes = ['/login', '/_next', '/api/auth'];
+const publicRoutes = ['/login', '/forgot-password', '/auth/reset-password', '/_next', '/api/auth'];
 
 function isProtected(pathname: string) {
   if (publicRoutes.some((route) => pathname.startsWith(route))) return false;
