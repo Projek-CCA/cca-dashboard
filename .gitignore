@@ -1,1 +1,38 @@
-.vercel
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# build
+dist/
+
+# environment
+.env
+.env.local
+.env.production
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+*.swp
+*.swo
+
+# secrets
+CREDENTIALS.md
+**/CREDENTIALS.md
+
+# scripts (local tooling)
+scripts/
+test_*.sh
+*.py
+*.js
+
+# misc
+.node-version
+faiz-razak-gsb-viz.html
