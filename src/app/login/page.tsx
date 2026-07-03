@@ -83,6 +83,9 @@ function LoginForm() {
           </button>
         </form>
         <p className="login-footer">
+          <Link href="/forgot-password">Forgot password?</Link>
+        </p>
+        <p className="login-footer">
           <Link href="/">Back to home</Link>
         </p>
       </div>
