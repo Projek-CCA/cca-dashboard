@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
-export type UserRole = 'admin' | 'project_manager' | 'qc' | 'editor' | null;
+export type UserRole = 'super_admin' | 'admin' | 'general_manager' | 'manager' | 'project_manager' | 'qc' | 'editor' | 'client' | 'social_media_admin' | null;
 
 interface AuthUser {
   id: string;
@@ -18,6 +18,10 @@ interface AuthContextValue {
   loading: boolean;
   role: UserRole;
   signOut: () => Promise<void>;
+  // Idle-timeout stubs (not wired yet — always false/0)
+  idleWarning: boolean;
+  resetIdle: () => void;
+  remainingSeconds: number;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -25,6 +29,9 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   role: null,
   signOut: async () => {},
+  idleWarning: false,
+  resetIdle: () => {},
+  remainingSeconds: 0,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -96,6 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         role: user?.role ?? null,
         signOut,
+        idleWarning: false,
+        resetIdle: () => {},
+        remainingSeconds: 0,
       }}
     >
       {children}
