@@ -8,6 +8,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { StatusPill } from '@/components/StatusPill';
 import type { CalendarDay, ContentItem } from '@/lib/types';
 import { recentActivity } from '@/lib/mock-data';
+import { useAuth } from '@/lib/auth-context';
 
 const navItems = [
   { href: '/calendar', label: 'Content Calendar', active: true },
@@ -37,9 +38,29 @@ interface CalendarClientProps {
 }
 
 export function CalendarClient({ days, items }: CalendarClientProps) {
+  const { user } = useAuth();
   const [filter, setFilter] = useState<Filter>('All');
   const [query, setQuery] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+
+  // If user is a client, restrict items to their own clientId
+  const filteredItems = useMemo(() => {
+    if (user?.role === 'client' && user?.client_id) {
+      return items.filter((item) => item.clientId === user.client_id);
+    }
+    return items; // staff sees all
+  }, [items, user?.role, user?.client_id]);
+
+  // Recompute days with filtered items
+  const filteredDays = useMemo(() => days.map((day) => ({
+    ...day,
+    items: day.items.filter((item) => {
+      if (user?.role === 'client' && user?.client_id) {
+        return item.clientId === user.client_id;
+      }
+      return true;
+    }),
+  })), [days, user?.role, user?.client_id]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -48,18 +69,18 @@ export function CalendarClient({ days, items }: CalendarClientProps) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const visibleDays = useMemo(() => days.map((day) => ({
+  const visibleDays = useMemo(() => filteredDays.map((day) => ({
     ...day,
     items: day.items.filter((item) => matchesFilter(item, filter) && item.title.toLowerCase().includes(query.toLowerCase())),
-  })), [days, filter, query]);
+  })), [filteredDays, filter, query]);
 
-  const pending = useMemo(() => items.filter((item) => item.status === 'Pending Client Approval').slice(0, 3), [items]);
+  const pending = useMemo(() => filteredItems.filter((item) => item.status === 'Pending Client Approval').slice(0, 3), [filteredItems]);
   const metrics = useMemo(() => [
-    { label: 'Total content', value: String(items.length) },
-    { label: 'Need approval', value: String(items.filter((item) => item.status === 'Pending Client Approval').length) },
-    { label: 'Ready to post', value: String(items.filter((item) => item.status === 'Ready to Post').length) },
-    { label: 'Posted', value: String(items.filter((item) => item.status === 'Posted').length) },
-  ], [items]);
+    { label: 'Total content', value: String(filteredItems.length) },
+    { label: 'Need approval', value: String(filteredItems.filter((item) => item.status === 'Pending Client Approval').length) },
+    { label: 'Ready to post', value: String(filteredItems.filter((item) => item.status === 'Ready to Post').length) },
+    { label: 'Posted', value: String(filteredItems.filter((item) => item.status === 'Posted').length) },
+  ], [filteredItems]);
 
   return (
     <AppShell sectionLabel="Client Portal" navItems={navItems} sideTitle="Client view" sideCopy="Client sees only their own content calendar, review actions, final links, and comments.">

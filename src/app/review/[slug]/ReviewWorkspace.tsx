@@ -8,6 +8,7 @@ import { StatusPill } from '@/components/StatusPill';
 import type { ActivityItem, Comment, ContentItem, ContentStatus, Visibility } from '@/lib/types';
 import type { ReviewDecision, ReviewRecord } from '@/lib/review-store';
 import { deriveStatus } from '@/lib/review-store';
+import { useAuth } from '@/lib/auth-context';
 
 const navItems = [
   { href: '/calendar', label: 'Content Calendar' },
@@ -28,6 +29,7 @@ interface ReviewWorkspaceProps {
 }
 
 export function ReviewWorkspace({ item }: ReviewWorkspaceProps) {
+  const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>(item.comments);
   const [commentBody, setCommentBody] = useState('');
   const [timestamp, setTimestamp] = useState('00:42');
@@ -103,6 +105,19 @@ export function ReviewWorkspace({ item }: ReviewWorkspaceProps) {
     }
     setApiLoading(false);
     setActiveTab('approval');
+  }
+
+  // Block client access to content that doesn't belong to them
+  if (user?.role === 'client' && user?.client_id && item.clientId !== user.client_id) {
+    return (
+      <main className="not-found">
+        <section className="panel">
+          <h1>Access denied</h1>
+          <p>You do not have permission to view this content.</p>
+          <Link className="btn primary" href="/calendar">Back to calendar</Link>
+        </section>
+      </main>
+    );
   }
 
   return (

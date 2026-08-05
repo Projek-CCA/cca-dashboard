@@ -11,6 +11,7 @@ interface AuthUser {
   email: string;
   role: UserRole;
   name?: string;
+  client_id?: string;
 }
 
 interface AuthContextValue {
@@ -71,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, role')
+        .select('name, role, client_id')
         .eq('id', userId)
         .maybeSingle();
 
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         role: (profile?.role as UserRole) || 'editor',
         name: profile?.name,
+        client_id: profile?.client_id ?? undefined,
       });
     } catch {
       setUser({ id: userId, email, role: 'editor' });

@@ -20,14 +20,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
 
-    // Fetch user profile to get role
+    // Fetch user profile to get role and client_id
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, client_id')
       .eq('id', data.user.id)
       .maybeSingle();
 
     const role = profile?.role || 'editor';
+    const client_id = profile?.client_id ?? undefined;
 
     // Determine redirect based on role
     const redirectMap: Record<string, string> = {
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       project_manager: '/dashboard',
       qc: '/qc',
       editor: '/editor/tasks',
+      client: '/calendar',
     };
 
     const redirect = redirectMap[role as string] || '/dashboard';
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
         id: data.user.id,
         email: data.user.email,
         role,
+        client_id,
       },
       redirect,
     });

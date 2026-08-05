@@ -3,15 +3,15 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name, role } = await request.json();
+    const { email, password, name, role, client_id } = await request.json();
 
     if (!email || !password || !name || !role) {
       return NextResponse.json({ error: 'email, password, name, and role are required' }, { status: 400 });
     }
 
-    const validRoles = ['admin', 'project_manager', 'qc', 'editor'];
+    const validRoles = ['admin', 'project_manager', 'qc', 'editor', 'client'];
     if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role. Must be: admin, project_manager, qc, or editor' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid role. Must be: admin, project_manager, qc, editor, or client' }, { status: 400 });
     }
 
     const supabase = await createClient();
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       email,
       role,
       avatar_initials: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+      ...(client_id ? { client_id } : {}),
     });
 
     if (profileError) {
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
         email: authData.user.email,
         name,
         role,
+        client_id: client_id ?? null,
       },
     });
   } catch {
