@@ -192,6 +192,17 @@ export default function ProjectTrackingPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // On first data load: if the current month tab doesn't exist yet,
+  // fall back to the most recent available month (not blank).
+  useEffect(() => {
+    const sorted = months.sort((a, b) => (MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b)));
+    if (sorted.length && !sorted.includes(CURRENT_MONTH)) {
+      setFilterMonth(sorted[sorted.length - 1]); // most recent month
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [months]);
+
+
   const sortedMonths = useMemo(() =>
     months.sort((a, b) => (MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b))),
     [months]);
