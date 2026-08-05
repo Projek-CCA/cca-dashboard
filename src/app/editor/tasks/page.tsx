@@ -1,57 +1,80 @@
-'use client';
+import { createClient } from '@/lib/supabase/server';
+import { EditorTasksClient } from './EditorTasksClient';
 
-import Link from 'next/link';
-import { AppShell } from '@/components/AppShell';
-import { Button } from '@/components/Button';
-import { MetricCard } from '@/components/MetricCard';
-import { StatusPill } from '@/components/StatusPill';
-import { useAuth } from '@/lib/auth-context';
+export const dynamic = 'force-dynamic';
 
-const editorMetrics = [
-  { label: 'Assigned', value: '8' },
-  { label: 'Due today', value: '3' },
-  { label: 'In amendment', value: '2' },
-  { label: 'Submitted', value: '14' },
-];
+interface Task {
+  id: string;
+  sheet_tab: string;
+  content_no: number | null;
+  content_title: string;
+  client_name: string;
+  video_editor: string;
+  status: string;
+  deadline: string | null;
+  delivery_status: string;
+  completion_date: string | null;
+  content_ref: string;
+}
 
-const tasks = [
-  { id: 'e1', title: 'Leadership myth short', client: 'Munif Isa', due: 'Today, 6:00 PM', status: 'Editing', raw: 'Raw Drive folder', notes: 'Note to editor', slug: 'content-scaling-mistakes', priority: 'High' },
-  { id: 'e2', title: 'Hiring without clarity', client: 'Munif Isa', due: 'Tomorrow, 12:00 PM', status: 'Amendments Requested', raw: 'Raw Drive folder', notes: 'Timestamp comments', slug: 'content-scaling-mistakes', priority: 'High' },
-  { id: 'e3', title: 'Recruitment pain point reel', client: 'UCMI', due: 'Jan 18, 5:00 PM', status: 'Pending QC', raw: 'Raw Drive folder', notes: 'Storyboard', slug: 'content-scaling-mistakes', priority: 'Medium' },
-];
+const STAFF_ROLES = ['super_admin', 'general_manager', 'manager', 'admin', 'project_manager', 'qc', 'social_media_admin'];
 
-export default function EditorTasksPage() {
-  const { role } = useAuth();
+export default async function EditorTasksPage() {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return <EditorTasksClient tasks={[]} months={[]} statuses={[]} isEditor={false} editorName="" authRedirect />;
+  }
+
+  // Resolve profile (id first, email fallback — ids can mismatch auth.users.id)
+  let { data: profile } = await supabase
+    .from('profiles')
+    .select('name, role')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (!profile) {
+    const { data: pb } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('email', user.email)
+      .maybeSingle();
+    profile = pb;
+  }
+
+  const profileName = (profile?.name || '').trim();
+  const role = profile?.role as string | undefined;
+  const isEditor = role === 'editor';
+  const isStaff = !!role && STAFF_ROLES.includes(role);
+
+  // Editor: only their own tasks (matched by sheet editor name, case-insensitive).
+  // Staff: full task list (lightweight view of the tracking sheet).
+  let query = supabase
+    .from('project_tasks')
+    .select('*')
+    .order('deadline', { ascending: true })
+    .limit(1000);
+  if (isEditor) query = query.ilike('video_editor', profileName);
+
+  const { data: tasks } = await query;
+  const allTasks = (tasks || []) as Task[];
+
+  // Live filter options — pulled from actual data (never hardcoded)
+  const { data: monthRows } = await supabase
+    .from('project_tasks')
+    .select('sheet_tab')
+    .limit(1000);
+  const months = [...new Set((monthRows || []).map((m) => m.sheet_tab))].sort();
+
+  const statuses = [...new Set(allTasks.map((t) => t.status).filter(Boolean))].sort();
 
   return (
-    <AppShell sectionLabel="Editor Portal" navItems={[]} sideTitle="Editor view" sideCopy="Editors should only see assigned work, raw footage links, notes, deadlines, amendment comments, and upload/submission actions." role={role}>
-      <div className="topbar">
-        <div className="crumb">Editor Portal / <b>My Tasks</b></div>
-        <div className="top-actions"><Button>Upload output</Button><Button variant="primary">Submit selected</Button></div>
-      </div>
-      <section className="hero">
-        <div><h1>Editor Task View</h1><p>A focused workspace for assigned edits, raw footage, notes, deadlines, amendments, and submissions.</p></div>
-        <div className="summary">{editorMetrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}</div>
-      </section>
-      <section className="panel task-table-panel">
-        <div className="panel-head"><h2>Assigned edits</h2><Button>Filter by status</Button></div>
-        <div className="task-table">
-          <div className="task-row header-row"><span>Content</span><span>Status</span><span>Resources</span><span>Due</span><span>Action</span></div>
-          {tasks.map((task) => (
-            <div className="task-row" key={task.id}>
-              <div><strong>{task.title}</strong><small>{task.client} · Priority {task.priority}</small></div>
-              <StatusPill label={task.status} />
-              <div className="resource-links"><button>{task.raw}</button><button>{task.notes}</button></div>
-              <span className="due-text">{task.due}</span>
-              <Link className="approval-btn" href={`/review/${task.slug}`}>{task.status === 'Amendments Requested' ? 'View comments' : 'Open'}</Link>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="drawer">
-        <div className="panel"><div className="panel-head"><h2>Submission checklist</h2></div><div className="list"><div className="row"><div className="icon">🎬</div><div><strong>Upload output link</strong><small>Paste Google Drive output link or upload to assigned folder.</small></div><span className="priority">Required</span></div><div className="row"><div className="icon">💬</div><div><strong>Reply to amendment comments</strong><small>Mark each timestamp comment as resolved before submitting.</small></div><span className="priority">Required</span></div><div className="row"><div className="icon">✅</div><div><strong>Submit for QC</strong><small>Status moves to Pending QC and CCA team gets notified.</small></div><span className="priority">Final</span></div></div></div>
-        <div className="panel"><div className="panel-head"><h2>Performance snapshot</h2></div><div className="activity"><div className="event"><div className="icon">⚡</div><div><p>86% on-time delivery this month</p><small>Mocked from future editor performance table.</small></div></div><div className="event"><div className="icon">🔁</div><div><p>2 revisions requested</p><small>Tracks amendment rate per editor.</small></div></div></div></div>
-      </section>
-    </AppShell>
+    <EditorTasksClient
+      tasks={allTasks}
+      months={months}
+      statuses={statuses}
+      isEditor={isEditor}
+      editorName={profileName}
+    />
   );
 }
