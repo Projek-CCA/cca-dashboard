@@ -55,6 +55,20 @@ function pluralise(word: string): string {
   return word + 's';
 }
 
+/* ── useIsMobile Hook ──────────────────────── */
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return isMobile;
+}
+
 /* ── Add Task Modal ─────────────────────────── */
 
 function AddTaskModal({
@@ -149,6 +163,7 @@ export default function ProjectTrackingPage() {
   const [sortKey, setSortKey] = useState<string>('deadline');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [showAddTask, setShowAddTask] = useState(false);
+  const isMobile = useIsMobile();
 
   /* Auth check */
   useEffect(() => {
@@ -252,8 +267,12 @@ export default function ProjectTrackingPage() {
       </div>
 
       {/* Filters */}
-      <div style={filterBarStyle}>
-        <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, flex: 1, minWidth: 120 }} />
+      <div style={{
+        ...filterBarStyle,
+        ...(isMobile ? { flexDirection: 'column', alignItems: 'stretch', gap: 6, padding: '8px 10px' } : {}),
+      }}>
+        <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 120, padding: isMobile ? '6px 4px' : undefined }} />
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
         <QuickSelect value={filterClient} onChange={setFilterClient} options={clients} label="Client" />
         <select
           value={filterMonth}
@@ -267,6 +286,7 @@ export default function ProjectTrackingPage() {
         <QuickSelect value={filterEditor} onChange={setFilterEditor} options={editors} label="Editor" />
         <QuickSelect value={filterStatus} onChange={setFilterStatus} options={statuses} label="Status" />
         <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{filtered.length} of {tasks.length}</span>
+        </div>
       </div>
 
       {/* Expand all + count */}
@@ -295,6 +315,7 @@ export default function ProjectTrackingPage() {
                   editors={editors}
                   statuses={statuses}
                   deliveryStatuses={deliveryStatuses}
+                  isMobile={isMobile}
                 />
               ))}
             </div>
@@ -310,7 +331,7 @@ export default function ProjectTrackingPage() {
 
 /* ── Editable Date Cell ───────────────────── */
 
-function EditableDate({ value, onChange, disabled }: { value: string | null; onChange: (v: string) => void; disabled: boolean }) {
+function EditableDate({ value, onChange, disabled, isMobile }: { value: string | null; onChange: (v: string) => void; disabled: boolean; isMobile?: boolean }) {
   const [editing, setEditing] = useState(false);
 
   if (editing && !disabled) {
@@ -321,12 +342,12 @@ function EditableDate({ value, onChange, disabled }: { value: string | null; onC
         onChange={(e) => { onChange(e.target.value); setEditing(false); }}
         onBlur={() => setEditing(false)}
         autoFocus
-        style={{ border: '1px solid var(--blue)', borderRadius: 4, padding: '2px 4px', fontSize: 11, fontFamily: 'inherit', width: 100 }}
+        style={{ border: '1px solid var(--blue)', borderRadius: 4, padding: isMobile ? '8px 6px' : '2px 4px', fontSize: isMobile ? 14 : 11, fontFamily: 'inherit', width: isMobile ? '100%' : 100, minHeight: isMobile ? 44 : undefined, boxSizing: 'border-box' }}
       />
     );
   }
   return (
-    <span onClick={() => !disabled && setEditing(true)} style={{ cursor: disabled ? 'default' : 'pointer', borderBottom: value ? '1px dashed var(--line)' : 'none' }} title="Click to edit">
+    <span onClick={() => !disabled && setEditing(true)} style={{ cursor: disabled ? 'default' : 'pointer', borderBottom: value ? '1px dashed var(--line)' : 'none', display: 'inline-block', padding: isMobile ? '10px 4px' : undefined, minHeight: isMobile ? 44 : undefined, lineHeight: isMobile ? '24px' : undefined }} title="Click to edit">
       {fmtDate(value)}
     </span>
   );
@@ -378,9 +399,20 @@ function RawFilesCell({ value, onChange, disabled }: { value: string; onChange: 
   );
 }
 
+/* ── Mobile Field (label:value row) ────────── */
+
+function MobileField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }}>
+      <span style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.03em' }}>{label}</span>
+      <span style={{ flex: 1, fontSize: 12 }}>{value}</span>
+    </div>
+  );
+}
+
 /* ── Client Group Card ─────────────────────── */
 
-function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onFieldEdit, savingId, editors, statuses, deliveryStatuses }: any) {
+function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onFieldEdit, savingId, editors, statuses, deliveryStatuses, isMobile }: any) {
   const doneCount = tasks.filter((t: ProjectTask) => t.status === 'Done').length;
   const pct = Math.round((doneCount / tasks.length) * 100);
 
@@ -414,7 +446,78 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
           ))}
         </div>
       </button>
-      {isOpen && (
+      {isOpen && (isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10 }}>
+          {tasks.map((t: ProjectTask) => (
+            <div key={t.id} style={mobileCardStyle}>
+              <MobileField label="#" value={t.content_no ? String(t.content_no) : '—'} />
+              <MobileField
+                label="Title"
+                value={<span style={{ fontSize: 12, fontWeight: 500 }}>{t.content_title}</span>}
+              />
+              <MobileField
+                label="Raw Files"
+                value={
+                  <RawFilesCell
+                    value={t.content_ref || ''}
+                    onChange={(v: string) => onFieldEdit(t.id, 'content_ref', v)}
+                    disabled={savingId === t.id}
+                  />
+                }
+              />
+              <MobileField
+                label="Editor"
+                value={
+                  <select value={t.video_editor || ''} onChange={(e) => onFieldEdit(t.id, 'video_editor', e.target.value)} disabled={savingId === t.id} style={mobileSelectStyle}>
+                    <option value="">—</option>
+                    {editors.map((e: string) => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                }
+              />
+              <MobileField
+                label="Status"
+                value={
+                  <select value={t.status || ''} onChange={(e) => onFieldEdit(t.id, 'status', e.target.value)} disabled={savingId === t.id} style={{ ...mobileSelectStyle, ...statusPill(t.status) }}>
+                    <option value="">—</option>
+                    {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                }
+              />
+              <MobileField
+                label="Deadline"
+                value={
+                  <EditableDate
+                    value={t.deadline}
+                    onChange={(v: string) => onFieldEdit(t.id, 'deadline', v)}
+                    disabled={savingId === t.id}
+                    isMobile={isMobile}
+                  />
+                }
+              />
+              <MobileField
+                label="Delivery"
+                value={
+                  <select value={t.delivery_status || ''} onChange={(e) => onFieldEdit(t.id, 'delivery_status', e.target.value)} disabled={savingId === t.id} style={{ ...mobileSelectStyle, ...deliveryPill(t.delivery_status) }}>
+                    <option value="">—</option>
+                    {deliveryStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                }
+              />
+              <MobileField
+                label="Completed"
+                value={
+                  <EditableDate
+                    value={t.completion_date}
+                    onChange={(v: string) => onFieldEdit(t.id, 'completion_date', v)}
+                    disabled={savingId === t.id}
+                    isMobile={isMobile}
+                  />
+                }
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ background: '#fafafa', borderBottom: '1px solid var(--line)' }}>
@@ -476,7 +579,7 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
             ))}
           </tbody>
         </table>
-      )}
+      ))}
     </div>
   );
 }
@@ -518,3 +621,10 @@ const inputStyle: React.CSSProperties = { border: '1px solid var(--line)', borde
 
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.35)' };
 const modalStyle: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 8px 30px rgba(0,0,0,.15)', width: '90%', maxWidth: 440, padding: 24 };
+
+const mobileCardStyle: React.CSSProperties = {
+  border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', background: '#fff',
+};
+const mobileSelectStyle: React.CSSProperties = {
+  border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px', fontSize: 12, fontFamily: 'inherit', background: '#fff', width: '100%', minHeight: 44, boxSizing: 'border-box',
+};
