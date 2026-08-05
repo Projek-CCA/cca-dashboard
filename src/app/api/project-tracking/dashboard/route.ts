@@ -132,11 +132,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Merge amendment counts (by title match — approximations table links to content_items)
-  // Map sheet client names to amendment data via the content_items + approvals join
-  const clientAmendmentCounts: Record<string, number> = {};
-  // Simple: count amendments per client by joining via sheet titles
-  // Actually, let's just show amendment counts from the approvals table directly
   const totalAmendments = Object.values(amendmentCounts).reduce((s, c) => s + c, 0);
   const clientsWithAmendments = Object.keys(amendmentCounts).length;
 
@@ -169,6 +164,99 @@ export async function GET(request: NextRequest) {
   }
   const monthTrendList = Object.entries(monthTrend).sort(([a], [b]) => a.localeCompare(b));
 
+  // ---- 4. Amendments per editor (status === 'Amendment', grouped by video_editor) ----
+  const amendmentsPerEditor: Record<string, number> = {};
+  for (const t of allTasks) {
+    if (t.status === 'Amendment') {
+      const e = t.video_editor || 'Unassigned';
+      amendmentsPerEditor[e] = (amendmentsPerEditor[e] || 0) + 1;
+    }
+  }
+  const amendmentsPerEditorList = Object.entries(amendmentsPerEditor)
+    .sort(([, a], [, b]) => b - a);
+
+  // ---- 5. Editor throughput (per editor: total, breakdown by status with %) ----
+  const editorThroughput: Record<string, { total: number; statusCounts: Record<string, number> }> = {};
+  for (const t of allTasks) {
+    const e = t.video_editor || 'Unassigned';
+    if (!editorThroughput[e]) editorThroughput[e] = { total: 0, statusCounts: {} };
+    editorThroughput[e].total++;
+    const s = t.status || 'Unknown';
+    editorThroughput[e].statusCounts[s] = (editorThroughput[e].statusCounts[s] || 0) + 1;
+  }
+  const editorThroughputList = Object.entries(editorThroughput)
+    .map(([editor, data]) => ({
+      editor,
+      total: data.total,
+      breakdown: Object.entries(data.statusCounts)
+        .map(([status, count]) => ({
+          status,
+          count,
+          pct: Math.round((count / data.total) * 100),
+        }))
+        .sort((a, b) => b.count - a.count),
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  // ---- 6. Delivery performance per editor (late/early/deadline-day with %) ----
+  const deliveryPerEditor: Record<string, { total: number; early: number; onTime: number; late: number }> = {};
+  for (const t of allTasks) {
+    const e = t.video_editor || 'Unassigned';
+    if (!deliveryPerEditor[e]) deliveryPerEditor[e] = { total: 0, early: 0, onTime: 0, late: 0 };
+    deliveryPerEditor[e].total++;
+    if (t.delivery_status === 'EARLY!') deliveryPerEditor[e].early++;
+    else if (t.delivery_status === 'DEADLINE DAY') deliveryPerEditor[e].onTime++;
+    else if (t.delivery_status === 'LATE DELIVERY') deliveryPerEditor[e].late++;
+  }
+  const deliveryPerEditorList = Object.entries(deliveryPerEditor)
+    .map(([editor, d]) => ({
+      editor,
+      total: d.total,
+      early: d.early,
+      earlyPct: d.total > 0 ? Math.round((d.early / d.total) * 100) : 0,
+      onTime: d.onTime,
+      onTimePct: d.total > 0 ? Math.round((d.onTime / d.total) * 100) : 0,
+      late: d.late,
+      latePct: d.total > 0 ? Math.round((d.late / d.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.late - a.late);
+
+  // ---- 7. Client revision heatmap (clients with most Amendment-status tasks) ----
+  const clientAmendments: Record<string, number> = {};
+  for (const t of allTasks) {
+    if (t.status === 'Amendment') {
+      const c = t.client_name || 'Unknown';
+      clientAmendments[c] = (clientAmendments[c] || 0) + 1;
+    }
+  }
+  const AMENDMENT_THRESHOLD = 3;
+  const clientRevisionHeatmap = Object.entries(clientAmendments)
+    .map(([client, count]) => ({
+      client,
+      amendmentCount: count,
+      exceedsThreshold: count > AMENDMENT_THRESHOLD,
+    }))
+    .sort((a, b) => b.amendmentCount - a.amendmentCount);
+
+  // ---- 8. Overdue tasks (deadline < today AND status != 'Done') ----
+  const overdueTasks = allTasks
+    .filter((t) => {
+      if (!t.deadline || t.status === 'Done') return false;
+      return t.deadline < todayStr;
+    })
+    .map((t) => ({
+      id: t.id,
+      client_name: t.client_name,
+      content_title: t.content_title,
+      video_editor: t.video_editor,
+      status: t.status,
+      deadline: t.deadline,
+      sheet_tab: t.sheet_tab,
+    }))
+    .sort((a, b) => (a.deadline || '').localeCompare(b.deadline || ''));
+  const overdueCount = overdueTasks.length;
+  const overdueTop5 = overdueTasks.slice(0, 5);
+
   return NextResponse.json({
     ok: true,
     kpis: { total, done, inProgress, pending, notStarted, late, early, onTime },
@@ -177,6 +265,10 @@ export async function GET(request: NextRequest) {
     monthTrend: monthTrendList,
     amendmentSummary: { totalAmendments, clientsWithAmendments },
     editorNames,
+    amendmentsPerEditor: amendmentsPerEditorList,
+    editorThroughput: editorThroughputList,
+    deliveryPerEditor: deliveryPerEditorList,
+    clientRevisionHeatmap,
+    overdueTasks: { count: overdueCount, top5: overdueTop5 },
   });
 }
-
