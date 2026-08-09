@@ -251,6 +251,14 @@ export default function ProjectTrackingPage() {
 
   const handleSort = (k: string) => { if (sortKey === k) setSortDir((d) => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(k); setSortDir('asc'); } };
 
+  const resetFilters = useCallback(() => {
+    setSearch('');
+    setFilterClient('');
+    setFilterEditor('');
+    setFilterStatus('');
+    setFilterMonth('__ALL__');
+  }, []);
+
   const handleFieldEdit = useCallback(async (tid: string, f: string, v: string) => {
     setSavingId(tid);
     setTasks((p) => p.map((t) => t.id === tid ? { ...t, [f]: v } : t));
@@ -301,17 +309,51 @@ export default function ProjectTrackingPage() {
         </div>
       </div>
 
-      {/* Expand all + count */}
+      {/* Expand all + count — hidden while loading */}
+      {!loading && (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <button onClick={toggleAll} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--blue)', padding: 0 }}>
           {expanded.size === grouped.length ? 'Collapse all' : 'Expand all'} ({grouped.length} clients)
         </button>
       </div>
+      )}
 
       {/* Groups */}
-      {loading ? <p style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>Loading…</p>
-        : grouped.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>No tasks match.</p>
-          : (
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} style={{
+              border: '1px solid var(--line)', borderRadius: 10,
+              background: 'var(--surface)', padding: '14px 16px',
+            }}>
+              <div className="skeleton-bar" style={{ height: 14, width: '26%', marginBottom: 10 }} />
+              <div className="skeleton-bar" style={{ height: 10, width: '48%' }} />
+            </div>
+          ))}
+        </div>
+      ) : grouped.length === 0 ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: 16, minHeight: 260, textAlign: 'center',
+        }}>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 8, padding: 28, maxWidth: 400, width: '100%',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{ fontSize: 36, lineHeight: 1, opacity: 0.35 }}>🔍</div>
+            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
+              No tasks match your current filters
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45 }}>
+              Try selecting a different month or clear filters
+            </div>
+            <button onClick={resetFilters} className="btn small outline" style={{ fontSize: 13, marginTop: 4 }}>
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {grouped.map(([client, ctasks]) => (
                 <ClientGroup

@@ -24,7 +24,7 @@ export default async function EditorTasksPage() {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return <EditorTasksClient tasks={[]} months={[]} statuses={[]} isEditor={false} editorName="" authRedirect />;
+    return <EditorTasksClient tasks={[]} months={[]} statuses={[]} clients={[]} isEditor={false} editorName="" authRedirect />;
   }
 
   // Resolve profile (id first, email fallback — ids can mismatch auth.users.id)
@@ -68,11 +68,15 @@ export default async function EditorTasksPage() {
 
   const statuses = [...new Set(allTasks.map((t) => t.status).filter(Boolean))].sort();
 
+  // Client filter options — pulled from the editor's own tasks
+  const clients = [...new Set(allTasks.map((t) => t.client_name).filter(Boolean))].sort();
+
   return (
     <EditorTasksClient
       tasks={allTasks}
       months={months}
       statuses={statuses}
+      clients={clients}
       isEditor={isEditor}
       editorName={profileName}
     />

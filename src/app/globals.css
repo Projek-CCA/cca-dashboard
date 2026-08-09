@@ -26,3 +26,12 @@
 .project-tracking-mobile .mobile-cards{display:none}
 .project-tracking-mobile .desktop-table{display:block}
 @media(max-width:767px){.project-tracking-mobile .mobile-cards{display:flex;flex-direction:column;gap:8px;padding:10px}.project-tracking-mobile .desktop-table{display:none}}
+
+/* Editor Tasks — mobile card layout */
+.editor-tasks .editor-mobile-cards{display:none}
+.editor-tasks .editor-desktop-table{display:block}
+@media(max-width:767px){.editor-tasks .editor-mobile-cards{display:flex;flex-direction:column;gap:8px}.editor-tasks .editor-desktop-table{display:none}}
+
+/* Skeleton loading animation */
+@keyframes skeleton-pulse{0%,100%{opacity:.35}50%{opacity:.75}}
+.skeleton-bar{background:var(--line);border-radius:4px;animation:skeleton-pulse 1.6s ease-in-out infinite}
