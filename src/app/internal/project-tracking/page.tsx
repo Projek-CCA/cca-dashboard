@@ -263,6 +263,14 @@ export default function ProjectTrackingPage() {
   return (
     <AppShell sectionLabel="Internal" sideTitle="Project Tracking" sideCopy={`${tasks.length} tasks from Google Sheets. Edits sync both ways.`}>
       {/* Top bar */}
+      <style>{`
+        .mobile-cards { display: none; }
+        .desktop-table { display: block; }
+        @media (max-width: 767px) {
+          .mobile-cards { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+          .desktop-table { display: none; }
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="crumb">
@@ -457,140 +465,145 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
           ))}
         </div>
       </button>
-      {isOpen && (isMobile ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10 }}>
-          {tasks.map((t: ProjectTask) => (
-            <div key={t.id} style={mobileCardStyle}>
-              <MobileField label="#" value={t.content_no ? String(t.content_no) : '—'} />
-              <MobileField
-                label="Title"
-                value={<span style={{ fontSize: 12, fontWeight: 500 }}>{t.content_title}</span>}
-              />
-              <MobileField
-                label="Raw Files"
-                value={
-                  <RawFilesCell
-                    value={t.content_ref || ''}
-                    onChange={(v: string) => onFieldEdit(t.id, 'content_ref', v)}
-                    disabled={savingId === t.id}
-                  />
-                }
-              />
-              <MobileField
-                label="Editor"
-                value={
-                  <select value={t.video_editor || ''} onChange={(e) => onFieldEdit(t.id, 'video_editor', e.target.value)} disabled={savingId === t.id} style={mobileSelectStyle}>
-                    <option value="">—</option>
-                    {editors.map((e: string) => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                }
-              />
-              <MobileField
-                label="Status"
-                value={
-                  <select value={t.status || ''} onChange={(e) => onFieldEdit(t.id, 'status', e.target.value)} disabled={savingId === t.id} style={{ ...mobileSelectStyle, ...statusPill(t.status) }}>
-                    <option value="">—</option>
-                    {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                }
-              />
-              <MobileField
-                label="Deadline"
-                value={
-                  <EditableDate
-                    value={t.deadline}
-                    onChange={(v: string) => onFieldEdit(t.id, 'deadline', v)}
-                    disabled={savingId === t.id}
-                    isMobile={isMobile}
-                  />
-                }
-              />
-              <MobileField
-                label="Delivery"
-                value={
-                  <select value={t.delivery_status || ''} onChange={(e) => onFieldEdit(t.id, 'delivery_status', e.target.value)} disabled={savingId === t.id} style={{ ...mobileSelectStyle, ...deliveryPill(t.delivery_status) }}>
-                    <option value="">—</option>
-                    {deliveryStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                }
-              />
-              <MobileField
-                label="Completed"
-                value={
-                  <EditableDate
-                    value={t.completion_date}
-                    onChange={(v: string) => onFieldEdit(t.id, 'completion_date', v)}
-                    disabled={savingId === t.id}
-                    isMobile={isMobile}
-                  />
-                }
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr style={{ background: '#fafafa', borderBottom: '1px solid var(--line)' }}>
-              <SortTh k="content_no" label="#" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="content_title" label="Title" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="content_ref" label="Raw Files" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="video_editor" label="Editor" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="status" label="Status" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="deadline" label="Deadline" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="delivery_status" label="Delivery" onSort={onSort} sortInd={sortInd} />
-              <SortTh k="completion_date" label="Completed" onSort={onSort} sortInd={sortInd} />
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((t: ProjectTask, i: number) => (
-              <tr key={t.id} style={{ borderBottom: '1px solid var(--line)', background: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
-                <td style={tdStyle}>{t.content_no || '—'}</td>
-                <td style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.content_title}>{t.content_title}</td>
-                <td style={tdStyle}>
-                  <RawFilesCell
-                    value={t.content_ref || ''}
-                    onChange={(v) => onFieldEdit(t.id, 'content_ref', v)}
-                    disabled={savingId === t.id}
-                  />
-                </td>
-                <td style={tdStyle}>
-                  <select value={t.video_editor || ''} onChange={(e) => onFieldEdit(t.id, 'video_editor', e.target.value)} disabled={savingId === t.id} style={{ ...selectInputStyle, maxWidth: 100 }}>
-                    <option value="">—</option>
-                    {editors.map((e: string) => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                </td>
-                <td style={tdStyle}>
-                  <select value={t.status || ''} onChange={(e) => onFieldEdit(t.id, 'status', e.target.value)} disabled={savingId === t.id} style={{ ...selectInputStyle, ...statusPill(t.status), border: 'none' }}>
-                    <option value="">—</option>
-                    {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>
-                  <EditableDate
-                    value={t.deadline}
-                    onChange={(v) => onFieldEdit(t.id, 'deadline', v)}
-                    disabled={savingId === t.id}
-                  />
-                </td>
-                <td style={tdStyle}>
-                  <select value={t.delivery_status || ''} onChange={(e) => onFieldEdit(t.id, 'delivery_status', e.target.value)} disabled={savingId === t.id} style={{ ...selectInputStyle, ...deliveryPill(t.delivery_status), border: 'none' }}>
-                    <option value="">—</option>
-                    {deliveryStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>
-                  <EditableDate
-                    value={t.completion_date}
-                    onChange={(v) => onFieldEdit(t.id, 'completion_date', v)}
-                    disabled={savingId === t.id}
-                  />
-                </td>
-              </tr>
+      {isOpen && (
+        <>
+          {/* Mobile card layout — always rendered, CSS media query controls visibility */}
+          <div className="mobile-cards">
+            {tasks.map((t: ProjectTask) => (
+              <div key={`mc-${t.id}`} style={mobileCardStyle}>
+                <MobileField label="#" value={t.content_no ? String(t.content_no) : '—'} />
+                <MobileField
+                  label="Title"
+                  value={<span style={{ fontSize: 12, fontWeight: 500 }}>{t.content_title}</span>}
+                />
+                <MobileField
+                  label="Raw Files"
+                  value={
+                    <RawFilesCell
+                      value={t.content_ref || ''}
+                      onChange={(v: string) => onFieldEdit(t.id, 'content_ref', v)}
+                      disabled={savingId === t.id}
+                    />
+                  }
+                />
+                <MobileField
+                  label="Editor"
+                  value={
+                    <select value={t.video_editor || ''} onChange={(e) => onFieldEdit(t.id, 'video_editor', e.target.value)} disabled={savingId === t.id} style={mobileSelectStyle}>
+                      <option value="">—</option>
+                      {editors.map((e: string) => <option key={e} value={e}>{e}</option>)}
+                    </select>
+                  }
+                />
+                <MobileField
+                  label="Status"
+                  value={
+                    <select value={t.status || ''} onChange={(e) => onFieldEdit(t.id, 'status', e.target.value)} disabled={savingId === t.id} style={{ ...mobileSelectStyle, ...statusPill(t.status) }}>
+                      <option value="">—</option>
+                      {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  }
+                />
+                <MobileField
+                  label="Deadline"
+                  value={
+                    <EditableDate
+                      value={t.deadline}
+                      onChange={(v: string) => onFieldEdit(t.id, 'deadline', v)}
+                      disabled={savingId === t.id}
+                      isMobile={isMobile}
+                    />
+                  }
+                />
+                <MobileField
+                  label="Delivery"
+                  value={
+                    <select value={t.delivery_status || ''} onChange={(e) => onFieldEdit(t.id, 'delivery_status', e.target.value)} disabled={savingId === t.id} style={{ ...mobileSelectStyle, ...deliveryPill(t.delivery_status) }}>
+                      <option value="">—</option>
+                      {deliveryStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  }
+                />
+                <MobileField
+                  label="Completed"
+                  value={
+                    <EditableDate
+                      value={t.completion_date}
+                      onChange={(v: string) => onFieldEdit(t.id, 'completion_date', v)}
+                      disabled={savingId === t.id}
+                      isMobile={isMobile}
+                    />
+                  }
+                />
+              </div>
             ))}
-          </tbody>
-        </table>
-      ))}
+          </div>
+          {/* Desktop table layout — always rendered, CSS media query controls visibility */}
+          <div className="desktop-table">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#fafafa', borderBottom: '1px solid var(--line)' }}>
+                  <SortTh k="content_no" label="#" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="content_title" label="Title" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="content_ref" label="Raw Files" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="video_editor" label="Editor" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="status" label="Status" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="deadline" label="Deadline" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="delivery_status" label="Delivery" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="completion_date" label="Completed" onSort={onSort} sortInd={sortInd} />
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((t: ProjectTask, i: number) => (
+                  <tr key={`dt-${t.id}`} style={{ borderBottom: '1px solid var(--line)', background: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                    <td style={tdStyle}>{t.content_no || '—'}</td>
+                    <td style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.content_title}>{t.content_title}</td>
+                    <td style={tdStyle}>
+                      <RawFilesCell
+                        value={t.content_ref || ''}
+                        onChange={(v) => onFieldEdit(t.id, 'content_ref', v)}
+                        disabled={savingId === t.id}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <select value={t.video_editor || ''} onChange={(e) => onFieldEdit(t.id, 'video_editor', e.target.value)} disabled={savingId === t.id} style={{ ...selectInputStyle, maxWidth: 100 }}>
+                        <option value="">—</option>
+                        {editors.map((e: string) => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </td>
+                    <td style={tdStyle}>
+                      <select value={t.status || ''} onChange={(e) => onFieldEdit(t.id, 'status', e.target.value)} disabled={savingId === t.id} style={{ ...selectInputStyle, ...statusPill(t.status), border: 'none' }}>
+                        <option value="">—</option>
+                        {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>
+                      <EditableDate
+                        value={t.deadline}
+                        onChange={(v) => onFieldEdit(t.id, 'deadline', v)}
+                        disabled={savingId === t.id}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <select value={t.delivery_status || ''} onChange={(e) => onFieldEdit(t.id, 'delivery_status', e.target.value)} disabled={savingId === t.id} style={{ ...selectInputStyle, ...deliveryPill(t.delivery_status), border: 'none' }}>
+                        <option value="">—</option>
+                        {deliveryStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>
+                      <EditableDate
+                        value={t.completion_date}
+                        onChange={(v) => onFieldEdit(t.id, 'completion_date', v)}
+                        disabled={savingId === t.id}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
