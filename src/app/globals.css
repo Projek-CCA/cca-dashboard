@@ -21,3 +21,8 @@
 
 /* Drawer / row links */
 .list .row{text-decoration:none;display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center;padding:14px;border-bottom:1px solid var(--line);cursor:pointer}.list .row:last-child{border-bottom:0}.list .row:hover{background:var(--surface-2)}.priority{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:6px}.priority.high{background:#fff1f0;color:var(--red)}.priority.medium{background:#fff5e6;color:var(--orange)}.priority.low{background:#f6f5f4;color:var(--soft)}
+
+/* Project tracking — mobile card layout (scoped, moved from inline <style>) */
+.project-tracking-mobile .mobile-cards{display:none}
+.project-tracking-mobile .desktop-table{display:block}
+@media(max-width:767px){.project-tracking-mobile .mobile-cards{display:flex;flex-direction:column;gap:8px;padding:10px}.project-tracking-mobile .desktop-table{display:none}}

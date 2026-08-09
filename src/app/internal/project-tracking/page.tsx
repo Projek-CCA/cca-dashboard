@@ -263,15 +263,8 @@ export default function ProjectTrackingPage() {
   return (
     <AppShell sectionLabel="Internal" sideTitle="Project Tracking" sideCopy={`${tasks.length} tasks from Google Sheets. Edits sync both ways.`}>
       {/* Top bar */}
-      <style>{`
-        .mobile-cards { display: none; }
-        .desktop-table { display: block; }
-        @media (max-width: 767px) {
-          .mobile-cards { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
-          .desktop-table { display: none; }
-        }
-      `}</style>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div className="project-tracking-mobile">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="crumb">
             <Link href="/internal" style={{ textDecoration: 'none', color: 'inherit' }}>Internal</Link>
@@ -339,6 +332,7 @@ export default function ProjectTrackingPage() {
               ))}
             </div>
           )}
+      </div>
 
       {/* Add Task Modal */}
       {showAddTask && (
@@ -545,7 +539,7 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
                 <tr style={{ background: '#fafafa', borderBottom: '1px solid var(--line)' }}>
                   <SortTh k="content_no" label="#" onSort={onSort} sortInd={sortInd} />
                   <SortTh k="content_title" label="Title" onSort={onSort} sortInd={sortInd} />
-                  <SortTh k="content_ref" label="Raw Files" onSort={onSort} sortInd={sortInd} />
+                  <SortTh k="content_ref" label="📁 Raw Files" onSort={onSort} sortInd={sortInd} />
                   <SortTh k="video_editor" label="Editor" onSort={onSort} sortInd={sortInd} />
                   <SortTh k="status" label="Status" onSort={onSort} sortInd={sortInd} />
                   <SortTh k="deadline" label="Deadline" onSort={onSort} sortInd={sortInd} />
