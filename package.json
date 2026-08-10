@@ -17,5 +17,8 @@
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
   }
 }
