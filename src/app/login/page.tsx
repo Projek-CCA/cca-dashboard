@@ -103,7 +103,20 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={
+      <main className="login-page">
+        <div className="login-card">
+          <div className="login-header">
+            <div className="login-mark">CCA</div>
+            <h1>Content Coach Academy</h1>
+            <p className="login-subtitle">Internal workspace</p>
+          </div>
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+            Loading…
+          </div>
+        </div>
+      </main>
+    }>
       <LoginForm />
     </Suspense>
   );
