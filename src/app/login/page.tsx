@@ -1,17 +1,23 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  const [redirect, setRedirect] = useState('/dashboard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Read redirect param from URL on client mount — avoids useSearchParams SSR bailout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get('redirect');
+    if (r) setRedirect(r);
+  }, []);
 
   const handleSubmit = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
@@ -98,26 +104,5 @@ function LoginForm() {
         </p>
       </div>
     </main>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <main className="login-page">
-        <div className="login-card">
-          <div className="login-header">
-            <div className="login-mark">CCA</div>
-            <h1>Content Coach Academy</h1>
-            <p className="login-subtitle">Internal workspace</p>
-          </div>
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
-            Loading…
-          </div>
-        </div>
-      </main>
-    }>
-      <LoginForm />
-    </Suspense>
   );
 }

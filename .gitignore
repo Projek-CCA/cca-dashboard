@@ -36,3 +36,6 @@ test_*.sh
 # misc
 .node-version
 faiz-razak-gsb-viz.html
+
+# qc screenshots (local test artifacts — may contain secrets)
+qc-screenshots/
