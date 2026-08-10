@@ -2,14 +2,29 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
+  // Wrap everything so Next.js never renders an HTML error page —
+  // the client always gets valid JSON, even on catastrophic failures.
   try {
-    const { email, password } = await request.json();
+    let body: { email?: string; password?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const { email, password } = body;
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    let supabase;
+    try {
+      supabase = await createClient();
+    } catch (err) {
+      console.error('[auth/login] Failed to create Supabase client:', err);
+      return NextResponse.json({ error: 'Service configuration error' }, { status: 500 });
+    }
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -20,12 +35,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
 
+    // Guard against null user (should not happen when error is null, but be safe)
+    if (!data.user) {
+      console.error('[auth/login] signInWithPassword succeeded but user is null');
+      return NextResponse.json({ error: 'Authentication failed — no user returned' }, { status: 500 });
+    }
+
     // Fetch user profile to get role and client_id
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role, client_id')
       .eq('id', data.user.id)
       .maybeSingle();
+
+    if (profileError) {
+      console.error('[auth/login] Profile fetch error:', profileError);
+    }
 
     const role = profile?.role || 'editor';
     const client_id = profile?.client_id ?? undefined;
@@ -50,7 +75,9 @@ export async function POST(request: Request) {
       },
       redirect,
     });
-  } catch {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  } catch (err) {
+    // Last-resort catch — ensures JSON even if something unexpected throws
+    console.error('[auth/login] Unhandled error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

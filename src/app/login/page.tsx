@@ -25,13 +25,23 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      let data: { error?: string; redirect?: string };
+      try {
+        data = await response.json();
+      } catch {
+        // Server returned non-JSON (HTML error page, redirect, etc.)
+        setError('Server error. Please try again. If this persists, contact support.');
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         setError(data.error || 'Login failed');
         setLoading(false);
         return;
       }
+
+      setLoading(false);
 
       if (data.redirect) {
         router.push(data.redirect);
@@ -40,7 +50,8 @@ function LoginForm() {
       }
       router.refresh();
     } catch {
-      setError('Network error. Please try again.');
+      // Network-level failure (DNS, connection refused, etc.)
+      setError('Network error. Please check your connection and try again.');
       setLoading(false);
     }
   }, [email, password, redirect, router]);
