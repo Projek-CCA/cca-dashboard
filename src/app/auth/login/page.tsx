@@ -29,7 +29,6 @@ function LoginForm() {
       try {
         data = await response.json();
       } catch {
-        // Server returned non-JSON (HTML error page, redirect, etc.)
         setError('Server error. Please try again. If this persists, contact support.');
         setLoading(false);
         return;
@@ -50,7 +49,6 @@ function LoginForm() {
       }
       router.refresh();
     } catch {
-      // Network-level failure (DNS, connection refused, etc.)
       setError('Network error. Please check your connection and try again.');
       setLoading(false);
     }
@@ -101,7 +99,7 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
+export default function AuthLoginPage() {
   return (
     <Suspense>
       <LoginForm />

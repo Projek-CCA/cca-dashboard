@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     try {
       supabase = await createClient();
     } catch (err) {
-      console.error('[auth/login] Failed to create Supabase client:', err);
+      console.error('[api/auth/login] Failed to create Supabase client:', err);
       return NextResponse.json({ error: 'Service configuration error' }, { status: 500 });
     }
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     // Guard against null user (should not happen when error is null, but be safe)
     if (!data.user) {
-      console.error('[auth/login] signInWithPassword succeeded but user is null');
+      console.error('[api/auth/login] signInWithPassword succeeded but user is null');
       return NextResponse.json({ error: 'Authentication failed — no user returned' }, { status: 500 });
     }
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (profileError) {
-      console.error('[auth/login] Profile fetch error:', profileError);
+      console.error('[api/auth/login] Profile fetch error:', profileError);
     }
 
     const role = profile?.role || 'editor';
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     // Last-resort catch — ensures JSON even if something unexpected throws
-    console.error('[auth/login] Unhandled error:', err);
+    console.error('[api/auth/login] Unhandled error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
