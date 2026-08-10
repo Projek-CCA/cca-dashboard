@@ -132,7 +132,7 @@ function AddTaskModal({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
       {label}
       {children}
     </label>
@@ -287,7 +287,7 @@ export default function ProjectTrackingPage() {
       </div>
 
       {/* Filters */}
-      <div style={{
+      <div className="filter-bar" style={{
         ...filterBarStyle,
         ...(isMobile ? { flexDirection: 'column', alignItems: 'stretch', gap: 6, padding: '8px 10px' } : {}),
       }}>
@@ -297,7 +297,7 @@ export default function ProjectTrackingPage() {
         <select
           value={filterMonth}
           onChange={(e) => setFilterMonth(e.target.value)}
-          style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 6, WebkitAppearance: 'none', appearance: 'none' }}
+          style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 6, WebkitAppearance: 'none', appearance: 'none' }}
         >
           <option value="__ALL__">All months</option>
           <option value={`__YEAR__${CURRENT_YEAR}`}>All ({CURRENT_YEAR})</option>
@@ -305,7 +305,7 @@ export default function ProjectTrackingPage() {
         </select>
         <QuickSelect value={filterEditor} onChange={setFilterEditor} options={editors} label="Editor" />
         <QuickSelect value={filterStatus} onChange={setFilterStatus} options={statuses} label="Status" />
-        <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{filtered.length} of {tasks.length}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{filtered.length} of {tasks.length}</span>
         </div>
       </div>
 
@@ -338,14 +338,14 @@ export default function ProjectTrackingPage() {
         }}>
           <div style={{
             background: 'var(--surface)', border: '1px solid var(--line)',
-            borderRadius: 8, padding: 28, maxWidth: 400, width: '100%',
+            borderRadius: 8, padding: 'var(--space-md)', maxWidth: 400, width: '100%',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
           }}>
             <div style={{ fontSize: 36, lineHeight: 1, opacity: 0.35 }}>🔍</div>
             <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
               No tasks match your current filters
             </div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
               Try selecting a different month or clear filters
             </div>
             <button onClick={resetFilters} className="btn small outline" style={{ fontSize: 13, marginTop: 4 }}>
@@ -448,7 +448,7 @@ function RawFilesCell({ value, onChange, disabled }: { value: string; onChange: 
           📁 Raw Files
         </a>
       ) : (
-        <span style={{ color: 'var(--soft)', fontSize: 12 }}>—</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
       )}
     </span>
   );
@@ -459,7 +459,7 @@ function RawFilesCell({ value, onChange, disabled }: { value: string; onChange: 
 function MobileField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }}>
-      <span style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.03em' }}>{label}</span>
+      <span style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '.03em' }}>{label}</span>
       <span style={{ flex: 1, fontSize: 12 }}>{value}</span>
     </div>
   );
@@ -485,7 +485,7 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
       <button onClick={onToggle} style={clientHeaderStyle}>
         <span style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-block' }}>▶</span>
         <span style={{ fontWeight: 600, fontSize: 13 }}>{client}</span>
-        <span style={{ background: 'var(--surface-2)', borderRadius: 999, padding: '1px 8px', fontSize: 11, color: 'var(--muted)' }}>{tasks.length}</span>
+        <span style={{ background: 'var(--surface-2)', borderRadius: 999, padding: '1px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{tasks.length}</span>
         <div style={{ flex: 1, maxWidth: 80, height: 5, background: 'var(--line)', borderRadius: 3, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--green)' : 'var(--orange)', borderRadius: 3 }} />
         </div>
@@ -613,7 +613,7 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
                         {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </td>
-                    <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>
+                    <td style={{ ...tdStyle, color: 'var(--text-secondary)', fontSize: 11 }}>
                       <EditableDate
                         value={t.deadline}
                         onChange={(v) => onFieldEdit(t.id, 'deadline', v)}
@@ -626,7 +626,7 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
                         {deliveryStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </td>
-                    <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>
+                    <td style={{ ...tdStyle, color: 'var(--text-secondary)', fontSize: 11 }}>
                       <EditableDate
                         value={t.completion_date}
                         onChange={(v) => onFieldEdit(t.id, 'completion_date', v)}
@@ -646,7 +646,7 @@ function ClientGroup({ client, tasks, isOpen, onToggle, sortInd, onSort, onField
 
 function SortTh({ k, label, onSort, sortInd }: { k: string; label: string; onSort: (k: string) => void; sortInd: (k: string) => string }) {
   return (
-    <th onClick={() => onSort(k)} style={{ padding: '7px 10px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '.05em', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none', textAlign: 'left' }}>
+    <th onClick={() => onSort(k)} style={{ padding: '7px 10px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '.05em', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none', textAlign: 'left' }}>
       {label}{sortInd(k)}
     </th>
   );
@@ -654,7 +654,7 @@ function SortTh({ k, label, onSort, sortInd }: { k: string; label: string; onSor
 
 function QuickSelect({ value, onChange, options, label }: { value: string; onChange: (v: string) => void; options: string[]; label: string }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 6, WebkitAppearance: 'none', appearance: 'none' }}>
+    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 6, WebkitAppearance: 'none', appearance: 'none' }}>
       <option value="">All {pluralise(label)}</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
