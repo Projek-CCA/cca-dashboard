@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@supabase/ssr';
 
 export async function POST(request: Request) {
-  // Wrap everything so Next.js never renders an HTML error page —
-  // the client always gets valid JSON, even on catastrophic failures.
   try {
     let body: { email?: string; password?: string };
     try {
@@ -18,13 +16,69 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    let supabase;
-    try {
-      supabase = await createClient();
-    } catch (err) {
-      console.error('[api/auth/login] Failed to create Supabase client:', err);
-      return NextResponse.json({ error: 'Service configuration error' }, { status: 500 });
-    }
+    // Parse incoming cookies from the request header so the Supabase client
+    // can see any existing session (e.g. to clear stale auth tokens on login).
+    const cookieHeader = request.headers.get('cookie') || '';
+
+    // Build a response that will capture Set-Cookie headers set by
+    // the Supabase client during signInWithPassword.  We use a plain
+    // NextResponse as a "cookie bucket" and then marry it with the
+    // final JSON response so the browser actually receives the auth
+    // session cookies.
+    const cookieBucket = NextResponse.next();
+
+    // Accumulate every cookie Supabase sets so we can attach them to the
+    // final response.  We ALSO set them on cookieBucket so that any
+    // subsequent Supabase call within this handler (e.g. profile fetch)
+    // sees the updated auth cookies.
+    const capturedCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            // Merge cookies from the incoming request header with any
+            // cookies that were already set on cookieBucket during this
+            // handler's lifetime (so later Supabase calls see the auth
+            // cookies that signInWithPassword just created).
+            const merged: { name: string; value: string }[] = [];
+            const seen = new Set<string>();
+
+            // Start with cookies already set on cookieBucket
+            cookieBucket.cookies.getAll().forEach((c) => {
+              merged.push({ name: c.name, value: c.value });
+              seen.add(c.name);
+            });
+
+            // Then add request cookies that haven't been overridden
+            if (cookieHeader) {
+              cookieHeader.split('; ').forEach((c) => {
+                const eqIdx = c.indexOf('=');
+                const name = eqIdx === -1 ? c.trim() : c.substring(0, eqIdx).trim();
+                if (!seen.has(name)) {
+                  merged.push({
+                    name,
+                    value: eqIdx === -1 ? '' : c.substring(eqIdx + 1),
+                  });
+                }
+              });
+            }
+
+            return merged;
+          },
+          setAll(cookiesToSet) {
+            // Accumulate for final response & mirror to cookieBucket so
+            // subsequent supabase calls within this handler see them.
+            capturedCookies.push(...(cookiesToSet as typeof capturedCookies));
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieBucket.cookies.set(name, value, options);
+            });
+          },
+        },
+      },
+    );
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -66,7 +120,8 @@ export async function POST(request: Request) {
 
     const redirect = redirectMap[role as string] || '/dashboard';
 
-    return NextResponse.json({
+    // Build the final JSON response …
+    const finalResponse = NextResponse.json({
       user: {
         id: data.user.id,
         email: data.user.email,
@@ -75,6 +130,16 @@ export async function POST(request: Request) {
       },
       redirect,
     });
+
+    // … and attach every auth cookie that Supabase set during sign-in so
+    // the browser stores the session.  Without this the middleware on the
+    // next navigation sees an unauthenticated request and bounces back
+    // to /login.
+    capturedCookies.forEach(({ name, value, options }) => {
+      finalResponse.cookies.set(name, value, options as never);
+    });
+
+    return finalResponse;
   } catch (err) {
     // Last-resort catch — ensures JSON even if something unexpected throws
     console.error('[api/auth/login] Unhandled error:', err);
