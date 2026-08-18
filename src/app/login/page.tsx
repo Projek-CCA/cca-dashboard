@@ -13,11 +13,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Read redirect param from URL on client mount — avoids useSearchParams SSR bailout
+  // Read redirect/error params from URL on client mount — avoids useSearchParams SSR bailout
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get('redirect');
     if (r) setRedirect(r);
+    const e = params.get('error');
+    if (e) setError(e);
   }, []);
 
   const handleSubmit = useCallback(async (event: React.FormEvent) => {
