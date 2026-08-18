@@ -100,7 +100,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="login-footer">
-          <Link href="/">Back to home</Link>
+          <Link href="/forgot-password">Forgot password?</Link> · <Link href="/">Back to home</Link>
         </p>
       </div>
     </main>

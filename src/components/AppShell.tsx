@@ -174,7 +174,7 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
       >
         {mobileOpen ? '✕' : '☰'}
       </button>
-      <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
+      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <button
           onClick={toggle}
           className="sidebar-toggle"
