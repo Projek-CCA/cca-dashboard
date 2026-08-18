@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { Logomark } from '@/components/Logomark';
 
 function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
@@ -40,7 +41,7 @@ function ForgotPasswordForm() {
       <main className="login-page">
         <div className="login-card">
           <div className="login-header">
-            <div className="login-mark">CCA</div>
+            <div className="login-mark"><Logomark size={56} /></div>
             <h1>Check your email</h1>
             <p className="login-subtitle">
               If an account exists for <strong>{email}</strong>, we've sent a password reset link.
@@ -58,7 +59,7 @@ function ForgotPasswordForm() {
     <main className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="login-mark">CCA</div>
+          <div className="login-mark"><Logomark size={56} /></div>
           <h1>Reset password</h1>
           <p className="login-subtitle">Enter your email and we'll send you a reset link.</p>
         </div>

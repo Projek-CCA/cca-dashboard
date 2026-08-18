@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth, type UserRole } from '@/lib/auth-context';
+import { Logomark } from '@/components/Logomark';
 import { useState, useCallback, type ReactNode } from 'react';
 
 interface NavItem {
@@ -202,7 +203,7 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
         </button>
 
         <Link className="brand" href="/dashboard">
-          <span className="mark">CCA</span>
+          <span className="mark"><Logomark variant="onDark" size={20} /></span>
           {!collapsed && <span>Content Coach Academy</span>}
         </Link>
         <nav className="nav" aria-label={effectiveSectionLabel}>

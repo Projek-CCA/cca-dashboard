@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Logomark } from '@/components/Logomark';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function LoginPage() {
     <main className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="login-mark">CCA</div>
+          <div className="login-mark"><Logomark size={56} /></div>
           <h1>Content Coach Academy</h1>
           <p className="login-subtitle">Internal workspace</p>
         </div>

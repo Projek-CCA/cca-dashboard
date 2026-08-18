@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { Logomark } from '@/components/Logomark';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -47,7 +48,7 @@ function ResetPasswordForm() {
       <main className="login-page">
         <div className="login-card">
           <div className="login-header">
-            <div className="login-mark">CCA</div>
+            <div className="login-mark"><Logomark size={56} /></div>
             <h1>Password updated</h1>
             <p className="login-subtitle">Your password has been reset successfully.</p>
           </div>
@@ -64,7 +65,7 @@ function ResetPasswordForm() {
       <main className="login-page">
         <div className="login-card">
           <div className="login-header">
-            <div className="login-mark">CCA</div>
+            <div className="login-mark"><Logomark size={56} /></div>
             <h1>Reset password</h1>
             <p className="login-subtitle">Checking your reset link…</p>
           </div>
@@ -77,7 +78,7 @@ function ResetPasswordForm() {
     <main className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="login-mark">CCA</div>
+          <div className="login-mark"><Logomark size={56} /></div>
           <h1>Set new password</h1>
           <p className="login-subtitle">Enter your new password.</p>
         </div>
