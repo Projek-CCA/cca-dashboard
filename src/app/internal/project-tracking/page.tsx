@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
+import { sortMonths, currentMonthLabel } from '@/lib/months';
 
 interface ProjectTask {
   id: string;
@@ -19,12 +20,6 @@ interface ProjectTask {
   /** Google Drive / raw files link — mirrors column K ("Hard Links") in the sheet. */
   content_ref: string;
 }
-
-const MONTH_ORDER = [
-  'January 2026', 'February 2026', 'March 2026', 'April 2026',
-  'May 2026', 'June 2026', 'July 2026', 'August 2026',
-  'September 2026', 'October 2026', 'November 2026', 'December 2026',
-];
 
 /* ── Helpers ────────────────────────────────── */
 
@@ -143,7 +138,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default function ProjectTrackingPage() {
   // Default to the current month — client-side filter only (no re-fetch on month change).
-  const CURRENT_MONTH = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const CURRENT_MONTH = currentMonthLabel();
   const CURRENT_YEAR  = String(new Date().getFullYear());
 
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
@@ -195,7 +190,7 @@ export default function ProjectTrackingPage() {
   // On first data load: if the current month tab doesn't exist yet,
   // fall back to the most recent available month (not blank).
   useEffect(() => {
-    const sorted = months.sort((a, b) => (MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b)));
+    const sorted = sortMonths(months);
     if (sorted.length && !sorted.includes(CURRENT_MONTH)) {
       setFilterMonth(sorted[sorted.length - 1]); // most recent month
     }
@@ -203,9 +198,7 @@ export default function ProjectTrackingPage() {
   }, [months]);
 
 
-  const sortedMonths = useMemo(() =>
-    months.sort((a, b) => (MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b))),
-    [months]);
+  const sortedMonths = useMemo(() => sortMonths(months), [months]);
 
   const filtered = useMemo(() => {
     let list = tasks;

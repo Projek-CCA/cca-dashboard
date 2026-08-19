@@ -45,9 +45,18 @@ export async function GET(request: NextRequest) {
     { cookies: { getAll() { return request.cookies.getAll(); }, setAll() {} } },
   );
 
-  // ---- 1. Project tasks from sheet mirror ----
-  const { data: tasks } = await supabase.from('project_tasks').select('*').limit(2000);
+  const { searchParams } = new URL(request.url);
+  const month = searchParams.get('month') || '';
+
+  // ---- 1. Project tasks from sheet mirror (optionally scoped to one month tab) ----
+  let taskQuery = supabase.from('project_tasks').select('*').limit(2000);
+  if (month) taskQuery = taskQuery.eq('sheet_tab', month);
+  const { data: tasks } = await taskQuery;
   const allTasks = (tasks || []) as any[];
+
+  // Available months for the selector — always unfiltered, regardless of ?month=.
+  const { data: monthRows } = await supabase.from('project_tasks').select('sheet_tab').limit(2000);
+  const availableMonths = [...new Set((monthRows || []).map((m) => m.sheet_tab).filter(Boolean))];
 
   // ---- 2. Approvals / amendments from Supabase ----
   const { data: approvals } = await supabase.from('approvals').select('content_item_id, decision, created_at');
@@ -259,6 +268,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    selectedMonth: month,
+    availableMonths,
     kpis: { total, done, inProgress, pending, notStarted, late, early, onTime },
     editorLeaderboard,
     urgentClients,

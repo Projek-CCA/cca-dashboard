@@ -3,11 +3,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
+import { sortMonths, currentMonthLabel } from '@/lib/months';
 
 /* ── Types ──────────────────────────────────── */
 
 interface DashboardData {
   ok: boolean;
+  selectedMonth: string;
+  availableMonths: string[];
   kpis: {
     total: number; done: number; inProgress: number; pending: number;
     notStarted: number; late: number; early: number; onTime: number;
@@ -133,10 +136,13 @@ function StatCard({ title, children, accent }: { title: string; children: React.
 
 /* ── Main Page ──────────────────────────────── */
 
+const ALL_MONTHS = '__ALL__';
+
 export default function InternalDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filterMonth, setFilterMonth] = useState(currentMonthLabel());
   const isMobile = useIsMobile();
 
   /* Auth check */
@@ -146,11 +152,12 @@ export default function InternalDashboardPage() {
     });
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (month: string) => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/project-tracking/dashboard');
+      const qs = month && month !== ALL_MONTHS ? `?month=${encodeURIComponent(month)}` : '';
+      const res = await fetch(`/api/project-tracking/dashboard${qs}`);
       if (res.status === 403) { window.location.href = '/login'; return; }
       const json = await res.json();
       if (json.ok) setData(json);
@@ -161,7 +168,18 @@ export default function InternalDashboardPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(filterMonth); }, [load, filterMonth]);
+
+  // If the current month has no data yet, fall back to the most recent
+  // month that does — matches the same UX used on Project Tracking.
+  useEffect(() => {
+    if (!data || filterMonth === ALL_MONTHS) return;
+    const sorted = sortMonths(data.availableMonths);
+    if (sorted.length && !sorted.includes(filterMonth)) {
+      setFilterMonth(sorted[sorted.length - 1]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.availableMonths]);
 
   if (loading) {
     return (
@@ -176,7 +194,7 @@ export default function InternalDashboardPage() {
       <AppShell sectionLabel="Internal" sideTitle="Dashboard" sideCopy="Operations dashboard for CCA internal team.">
         <div style={{ textAlign: 'center', padding: 64 }}>
           <p style={{ color: 'var(--red)', marginBottom: 12 }}>{error || 'No data available'}</p>
-          <button onClick={load} className="btn small">Retry</button>
+          <button onClick={() => load(filterMonth)} className="btn small">Retry</button>
         </div>
       </AppShell>
     );
@@ -202,17 +220,27 @@ export default function InternalDashboardPage() {
   /* Section 5: Overdue tasks */
   const overdueTop5 = overdueTasks?.top5 || [];
   const overdueCount = overdueTasks?.count || 0;
+  const sortedMonths = sortMonths(data.availableMonths || []);
 
   return (
     <AppShell sectionLabel="Internal" sideTitle="Internal Dashboard" sideCopy={`${kpis.total} tasks tracked. Operations overview for CCA internal team.`}>
       {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div className="crumb">
           <Link href="/internal" style={{ textDecoration: 'none', color: 'inherit' }}>Internal</Link>
           {' / '}<b>Dashboard</b>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={load} className="btn small outline" style={{ fontSize: 12 }}>🔄 Refresh</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="select"
+            style={{ fontSize: 12, padding: '7px 10px' }}
+          >
+            <option value={ALL_MONTHS}>All months</option>
+            {sortedMonths.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <button onClick={() => load(filterMonth)} className="btn small outline" style={{ fontSize: 12 }}>🔄 Refresh</button>
           <Link href="/internal/project-tracking" className="btn small" style={{ fontSize: 13, textDecoration: 'none' }}>
             📋 Tasks
           </Link>
@@ -231,108 +259,111 @@ export default function InternalDashboardPage() {
         <KpiBox label="Deadline Day" value={kpis.onTime} color="var(--orange)" />
       </div>
 
-      {/* Row 1: Amendments per Editor + Delivery Performance — both per-editor bar summaries */}
+      {/* Two independent columns (not row-paired grid cells) — each column's height
+          is just the sum of its own cards, so a short card next to a tall one in
+          the other column never leaves a big empty gap underneath it. */}
       <div className="dash-grid">
-        <Section title="🔧 Amendments per Editor" accent="var(--red)">
-          {amendmentsPerEditor.length === 0 ? (
-            <EmptyState>No amendments found.</EmptyState>
-          ) : (
-            <BarChart
-              data={amendmentChartData}
-              maxVal={amendmentMax}
-              color={{ bg: 'var(--red)', fg: '#dc2626' }}
-            />
-          )}
-        </Section>
-
-        <Section title="🚚 Delivery Performance" accent="var(--orange)">
-          {deliveryPerEditor.length === 0 ? (
-            <EmptyState>No delivery data yet.</EmptyState>
-          ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <Section title="📊 Editor Throughput" accent="var(--blue)">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {deliveryPerEditor.map((d) => (
-                <div key={d.editor} style={editorCardStyle}>
-                  <div style={{ fontWeight: 600, fontSize: 13, minWidth: 130 }}>{d.editor}<span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11, marginLeft: 4 }}>({d.total})</span></div>
-                  <div style={{ flex: 1, height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
-                    {d.earlyPct > 0 && <div title={`Early: ${d.early} (${d.earlyPct}%)`} style={{ width: `${d.earlyPct}%`, height: '100%', background: '#15803d' }} />}
-                    {d.onTimePct > 0 && <div title={`On-time: ${d.onTime} (${d.onTimePct}%)`} style={{ width: `${d.onTimePct}%`, height: '100%', background: '#c2410c' }} />}
-                    {d.latePct > 0 && <div title={`Late: ${d.late} (${d.latePct}%)`} style={{ width: `${d.latePct}%`, height: '100%', background: '#dc2626' }} />}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 600 }}>
-                    <span style={{ color: '#15803d' }}>🟢 {d.early} ({d.earlyPct}%)</span>
-                    <span style={{ color: '#c2410c' }}>🟠 {d.onTime} ({d.onTimePct}%)</span>
-                    <span style={{ color: '#dc2626' }}>🔴 {d.late} ({d.latePct}%)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-      </div>
-
-      {/* Row 2: Editor Throughput + Client Revision Heatmap */}
-      <div className="dash-grid">
-        <Section title="📊 Editor Throughput" accent="var(--blue)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {topEditors.length === 0 ? <EmptyState>No editor data yet.</EmptyState> : (
-              topEditors.map((e) => (
-                <div key={e.editor} style={{ ...editorCardStyle, ...(isMobile ? { flexDirection: 'column', alignItems: 'flex-start' } : {}) }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, minWidth: isMobile ? undefined : 130 }}>
-                    {e.editor}
-                    <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11, marginLeft: 4 }}>({e.total})</span>
-                  </div>
-                  <div style={{ flex: 1, height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden', display: 'flex', minWidth: isMobile ? '100%' : undefined }}>
-                    {e.breakdown.map((b, i) => {
-                      const c = statusColor(b.status);
-                      return (
-                        <div
-                          key={i}
-                          title={`${b.status}: ${b.count} (${b.pct}%)`}
-                          style={{
-                            width: `${b.pct}%`, height: '100%', background: c.bg, minWidth: b.pct > 0 ? 3 : 0,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
-                    {e.breakdown.slice(0, 5).map((b) => {
-                      const c = statusColor(b.status);
-                      return (
-                        <span key={b.status} style={{ background: c.bg, color: c.fg, borderRadius: 999, padding: '1px 6px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                          {b.status} {b.count}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Section>
-
-        <Section title="🔥 Client Revision Heatmap" accent="#dc2626">
-          {clientRevisionHeatmap.length === 0 ? (
-            <EmptyState>No revision data.</EmptyState>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {clientRevisionHeatmap.map((c) => (
-                <div key={c.client} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
-                  <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {/* Heat bar */}
-                    <div style={{ width: Math.min(c.amendmentCount * 30, 200), height: 20, background: c.exceedsThreshold ? '#dc2626' : '#fca5a5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.amendmentCount}</span>
+              {topEditors.length === 0 ? <EmptyState>No editor data yet.</EmptyState> : (
+                topEditors.map((e) => (
+                  <div key={e.editor} style={{ ...editorCardStyle, ...(isMobile ? { flexDirection: 'column', alignItems: 'flex-start' } : {}) }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, minWidth: isMobile ? undefined : 130 }}>
+                      {e.editor}
+                      <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11, marginLeft: 4 }}>({e.total})</span>
                     </div>
-                    {c.exceedsThreshold && (
-                      <span style={{ background: '#fff1f0', color: '#dc2626', borderRadius: 999, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>⚠ &gt;3</span>
-                    )}
+                    <div style={{ flex: 1, height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden', display: 'flex', minWidth: isMobile ? '100%' : undefined }}>
+                      {e.breakdown.map((b, i) => {
+                        const c = statusColor(b.status);
+                        return (
+                          <div
+                            key={i}
+                            title={`${b.status}: ${b.count} (${b.pct}%)`}
+                            style={{
+                              width: `${b.pct}%`, height: '100%', background: c.bg, minWidth: b.pct > 0 ? 3 : 0,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
+                      {e.breakdown.slice(0, 5).map((b) => {
+                        const c = statusColor(b.status);
+                        return (
+                          <span key={b.status} style={{ background: c.bg, color: c.fg, borderRadius: 999, padding: '1px 6px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {b.status} {b.count}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-          )}
-        </Section>
+          </Section>
+
+          <Section title="🔧 Amendments per Editor" accent="var(--red)">
+            {amendmentsPerEditor.length === 0 ? (
+              <EmptyState>No amendments found.</EmptyState>
+            ) : (
+              <BarChart
+                data={amendmentChartData}
+                maxVal={amendmentMax}
+                color={{ bg: 'var(--red)', fg: '#dc2626' }}
+              />
+            )}
+          </Section>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <Section title="🚚 Delivery Performance" accent="var(--orange)">
+            {deliveryPerEditor.length === 0 ? (
+              <EmptyState>No delivery data yet.</EmptyState>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {deliveryPerEditor.map((d) => (
+                  <div key={d.editor} style={editorCardStyle}>
+                    <div style={{ fontWeight: 600, fontSize: 13, minWidth: 130 }}>{d.editor}<span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11, marginLeft: 4 }}>({d.total})</span></div>
+                    <div style={{ flex: 1, height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+                      {d.earlyPct > 0 && <div title={`Early: ${d.early} (${d.earlyPct}%)`} style={{ width: `${d.earlyPct}%`, height: '100%', background: '#15803d' }} />}
+                      {d.onTimePct > 0 && <div title={`On-time: ${d.onTime} (${d.onTimePct}%)`} style={{ width: `${d.onTimePct}%`, height: '100%', background: '#c2410c' }} />}
+                      {d.latePct > 0 && <div title={`Late: ${d.late} (${d.latePct}%)`} style={{ width: `${d.latePct}%`, height: '100%', background: '#dc2626' }} />}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 600 }}>
+                      <span style={{ color: '#15803d' }}>🟢 {d.early} ({d.earlyPct}%)</span>
+                      <span style={{ color: '#c2410c' }}>🟠 {d.onTime} ({d.onTimePct}%)</span>
+                      <span style={{ color: '#dc2626' }}>🔴 {d.late} ({d.latePct}%)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section title="🔥 Client Revision Heatmap" accent="#dc2626">
+            {clientRevisionHeatmap.length === 0 ? (
+              <EmptyState>No revision data.</EmptyState>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {clientRevisionHeatmap.map((c) => (
+                  <div key={c.client} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
+                    <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Heat bar */}
+                      <div style={{ width: Math.min(c.amendmentCount * 30, 200), height: 20, background: c.exceedsThreshold ? '#dc2626' : '#fca5a5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.amendmentCount}</span>
+                      </div>
+                      {c.exceedsThreshold && (
+                        <span style={{ background: '#fff1f0', color: '#dc2626', borderRadius: 999, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>⚠ &gt;3</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        </div>
       </div>
 
       {/* Section 5: Overdue Tasks — full width, most action-critical section */}
