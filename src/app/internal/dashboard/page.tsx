@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { AppShell } from '@/components/AppShell';
+import { AppShell, BASELINE_NAV_ITEMS } from '@/components/AppShell';
 import { sortMonths, currentMonthLabel } from '@/lib/months';
 
 /* ── Types ──────────────────────────────────── */
@@ -183,7 +183,7 @@ export default function InternalDashboardPage() {
 
   if (loading) {
     return (
-      <AppShell sectionLabel="Internal" sideTitle="Dashboard" sideCopy="Operations dashboard for CCA internal team.">
+      <AppShell sectionLabel="Internal" sideTitle="Dashboard" sideCopy="Operations dashboard for CCA internal team." navItems={BASELINE_NAV_ITEMS}>
         <div style={{ textAlign: 'center', padding: 64, color: 'var(--muted)' }}>Loading dashboard…</div>
       </AppShell>
     );
@@ -191,7 +191,7 @@ export default function InternalDashboardPage() {
 
   if (error || !data) {
     return (
-      <AppShell sectionLabel="Internal" sideTitle="Dashboard" sideCopy="Operations dashboard for CCA internal team.">
+      <AppShell sectionLabel="Internal" sideTitle="Dashboard" sideCopy="Operations dashboard for CCA internal team." navItems={BASELINE_NAV_ITEMS}>
         <div style={{ textAlign: 'center', padding: 64 }}>
           <p style={{ color: 'var(--red)', marginBottom: 12 }}>{error || 'No data available'}</p>
           <button onClick={() => load(filterMonth)} className="btn small">Retry</button>
@@ -223,7 +223,7 @@ export default function InternalDashboardPage() {
   const sortedMonths = sortMonths(data.availableMonths || []);
 
   return (
-    <AppShell sectionLabel="Internal" sideTitle="Internal Dashboard" sideCopy={`${kpis.total} tasks tracked. Operations overview for CCA internal team.`}>
+    <AppShell sectionLabel="Internal" sideTitle="Internal Dashboard" sideCopy={`${kpis.total} tasks tracked. Operations overview for CCA internal team.`} navItems={BASELINE_NAV_ITEMS}>
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div className="crumb">

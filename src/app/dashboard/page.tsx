@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { AppShell } from '@/components/AppShell';
+import { AppShell, BASELINE_NAV_ITEMS } from '@/components/AppShell';
 import { MetricCard } from '@/components/MetricCard';
 import { StatusPill } from '@/components/StatusPill';
 import { Button } from '@/components/Button';
@@ -69,7 +69,7 @@ export default function DashboardPage() {
   return (
     <AppShell
       sectionLabel="Dashboard"
-      navItems={[]}
+      navItems={BASELINE_NAV_ITEMS}
       sideTitle={isAdmin ? 'Admin Dashboard' : 'PM Dashboard'}
       sideCopy={
         isAdmin

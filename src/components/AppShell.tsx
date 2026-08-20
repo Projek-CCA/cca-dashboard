@@ -6,7 +6,7 @@ import { useAuth, type UserRole } from '@/lib/auth-context';
 import { Logomark } from '@/components/Logomark';
 import { useState, useCallback, type ReactNode } from 'react';
 
-interface NavItem {
+export interface NavItem {
   href: string;
   label: string;
   active?: boolean;
@@ -22,8 +22,20 @@ interface AppShellProps {
   role?: UserRole;
 }
 
+export const BASELINE_NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/calendar', label: 'Calendar' },
+  { href: '/internal/review-queue', label: 'Review Queue' },
+  { href: '/editor/tasks', label: 'Editor Tasks' },
+];
+
 function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string } {
-  switch (role) {
+  // Normalize so a role value that differs only in casing/whitespace
+  // (easy to introduce editing profiles.role by hand in Supabase) still
+  // matches a case below instead of silently falling through to an
+  // empty nav — leaving the mobile hamburger menu with no way out.
+  const normalized = (role || '').trim().toLowerCase();
+  switch (normalized) {
     case 'admin':
       return {
         label: 'Admin Workspace',
@@ -123,7 +135,10 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
         ],
       };
     default:
-      return { label: 'Workspace', items: [] };
+      // Unrecognized or not-yet-loaded role — never leave the nav fully
+      // empty (that's a dead end on mobile, where the sidebar is the
+      // only way to move between pages).
+      return { label: 'Workspace', items: BASELINE_NAV_ITEMS };
   }
 }
 
