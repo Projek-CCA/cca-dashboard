@@ -26,5 +26,6 @@ export function deliveryBucket(deadline, deliveredAt) {
   if (day(v) > day(d)) return 'LATE DELIVERY';
   return 'DEADLINE DAY';
 }
+export function clientWorkflowVisible(clientName, recordClientName, state) { return Boolean(clientName && clientName === recordClientName && (state === 'Client Review' || state === 'Client Amendment' || state === 'Approved for Posting')); }
 export function transitionOptions(state) { return transitions[state] || []; }
 export const WORKFLOW_STATES = Object.keys(transitions);

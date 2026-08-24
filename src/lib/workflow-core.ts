@@ -60,5 +60,9 @@ export function deliveryBucket(deadline: string | null, deliveredAt: string | nu
   return 'DEADLINE DAY';
 }
 
+export function clientWorkflowVisible(clientName: string | undefined, recordClientName: string, state: WorkflowState): boolean {
+  return Boolean(clientName && clientName === recordClientName && (state === 'Client Review' || state === 'Client Amendment' || state === 'Approved for Posting'));
+}
+
 export function transitionOptions(state: WorkflowState): WorkflowState[] { return transitions[state] || []; }
 export const WORKFLOW_STATES = Object.keys(transitions) as WorkflowState[];
