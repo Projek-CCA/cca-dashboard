@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth, type UserRole } from '@/lib/auth-context';
 import { Logomark } from '@/components/Logomark';
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
 
 export interface NavItem {
   href: string;
@@ -26,6 +26,8 @@ export const BASELINE_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/calendar', label: 'Calendar' },
   { href: '/internal/review-queue', label: 'Review Queue' },
+  { href: '/internal/workflow/board', label: 'Workflow Board' },
+  { href: '/internal/workflow', label: 'Process Guide' },
   { href: '/editor/tasks', label: 'Editor Tasks' },
 ];
 
@@ -43,10 +45,8 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
           { href: '/dashboard', label: 'Dashboard' },
           { href: '/internal/project-tracking', label: 'Project Tracking' },
           { href: '/calendar', label: 'Calendar' },
-          { href: '/internal/content-hub', label: 'Notion Content Hub' },
           { href: '/internal/review-queue', label: 'Review Queue' },
           { href: '/editor/tasks', label: 'Editor Tasks' },
-          { href: '/dashboard', label: 'Users' },
         ],
       };
     case 'project_manager':
@@ -56,7 +56,6 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
           { href: '/dashboard', label: 'Dashboard' },
           { href: '/internal/project-tracking', label: 'Project Tracking' },
           { href: '/calendar', label: 'Calendar' },
-          { href: '/internal/content-hub', label: 'Notion Content Hub' },
           { href: '/internal/review-queue', label: 'Review Queue' },
           { href: '/editor/tasks', label: 'Editor Tasks' },
         ],
@@ -67,7 +66,6 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
         items: [
           { href: '/qc', label: 'QC Review' },
           { href: '/internal/project-tracking', label: 'Project Tracking' },
-          { href: '/internal/content-hub', label: 'Notion Content Hub' },
           { href: '/internal/review-queue', label: 'Review Queue' },
           { href: '/calendar', label: 'Calendar' },
           { href: '/review/content-scaling-mistakes', label: 'Video Review' },
@@ -80,11 +78,8 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
           { href: '/dashboard', label: 'Dashboard' },
           { href: '/internal/project-tracking', label: 'Project Tracking' },
           { href: '/calendar', label: 'Calendar' },
-          { href: '/internal/content-hub', label: 'Notion Content Hub' },
           { href: '/internal/review-queue', label: 'Review Queue' },
           { href: '/editor/tasks', label: 'Editor Tasks' },
-          { href: '/dashboard', label: 'Users' },
-          { href: '/dashboard', label: 'Settings' },
         ],
       };
     case 'general_manager':
@@ -94,10 +89,8 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
           { href: '/dashboard', label: 'Dashboard' },
           { href: '/internal/project-tracking', label: 'Project Tracking' },
           { href: '/calendar', label: 'Calendar' },
-          { href: '/internal/content-hub', label: 'Notion Content Hub' },
           { href: '/internal/review-queue', label: 'Review Queue' },
           { href: '/editor/tasks', label: 'Editor Tasks' },
-          { href: '/dashboard', label: 'Users' },
         ],
       };
     case 'manager':
@@ -107,7 +100,6 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
           { href: '/dashboard', label: 'Dashboard' },
           { href: '/internal/project-tracking', label: 'Project Tracking' },
           { href: '/calendar', label: 'Calendar' },
-          { href: '/internal/content-hub', label: 'Notion Content Hub' },
           { href: '/internal/review-queue', label: 'Review Queue' },
           { href: '/editor/tasks', label: 'Editor Tasks' },
         ],
@@ -124,7 +116,7 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
         label: 'Client Portal',
         items: [
           { href: '/calendar', label: 'My Calendar' },
-          { href: '/review', label: 'My Reviews' },
+          { href: '/client/reviews', label: 'Review & Approve' },
         ],
       };
     case 'editor':
@@ -132,6 +124,7 @@ function getNavItemsForRole(role: UserRole): { items: NavItem[]; label: string }
         label: 'Editor Portal',
         items: [
           { href: '/editor/tasks', label: 'My Tasks' },
+          { href: '/editor/workflow', label: 'Submit & Amend' }
         ],
       };
     default:
@@ -157,6 +150,10 @@ const ICON_MAP: Record<string, string> = {
   'My Calendar': '📅',
   'My Reviews': '📝',
   'My Tasks': '✏️',
+  'Workflow Board': '🔁',
+  'Process Guide': '🧭',
+  'Review & Approve': '✅',
+  'Submit & Amend': '🎬',
 };
 
 export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy, role }: AppShellProps) {
@@ -165,6 +162,16 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const toggle = useCallback(() => setCollapsed((c) => !c), []);
+  const closeMobile = useCallback(() => setMobileOpen(false), []);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMobile();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen, closeMobile]);
 
   const [idleDismissed, setIdleDismissed] = useState(false);
 
@@ -176,7 +183,10 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
         ...item,
         active: pathname === item.href || pathname.startsWith(item.href + '/'),
       }))
-    : (navItems || []);
+    : (navItems || []).map((item) => ({
+        ...item,
+        active: pathname === item.href || pathname.startsWith(item.href + '/'),
+      }));
 
   const effectiveSectionLabel = roleNav ? roleNav.label : sectionLabel;
 
@@ -186,6 +196,7 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
       <button
         className="mobile-nav-toggle"
         onClick={() => setMobileOpen((o) => !o)}
+        aria-expanded={mobileOpen}
         aria-label="Toggle navigation"
       >
         {mobileOpen ? '✕' : '☰'}
@@ -227,6 +238,7 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
             <Link
               key={item.href + item.label}
               href={item.href}
+              onClick={closeMobile}
               className={item.active ? 'active' : undefined}
               title={collapsed ? item.label : undefined}
             >
@@ -287,13 +299,9 @@ export function AppShell({ children, sectionLabel, navItems, sideTitle, sideCopy
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,.3)',
-            zIndex: 99,
-          }}
-          onClick={() => setMobileOpen(false)}
+          className="mobile-nav-backdrop"
+          aria-label="Close navigation"
+          onClick={closeMobile}
         />
       )}
       <main className="main">

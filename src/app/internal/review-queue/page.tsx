@@ -14,11 +14,10 @@ const columnMetricKeys: Record<QueueTask['column'], string> = {
 };
 
 const navItems = [
-  { href: '/internal/review-queue', label: 'Overview' },
-  { href: '/internal/review-queue', label: 'Review Queue', active: true },
+  { href: '/internal/review-queue', label: 'Review Queue' },
   { href: '/calendar', label: 'Client Calendar' },
   { href: '/review/content-scaling-mistakes', label: 'Video Review' },
-  { href: '/internal/review-queue', label: 'Editor Tasks' },
+  { href: '/editor/tasks', label: 'Editor Tasks' },
 ];
 
 export default function InternalReviewQueuePage() {

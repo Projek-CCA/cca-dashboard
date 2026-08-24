@@ -1,0 +1,42 @@
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { AppShell } from '@/components/AppShell';
+import type { WorkflowRecord, WorkflowState } from '@/lib/workflow-store';
+
+const states:WorkflowState[]=['Assigned','Editing','Submitted for Review','Amendment','Manager Approved','Client Review','Client Amendment','Approved for Posting','Done'];
+const managerRoles=['manager','project_manager','general_manager','admin','super_admin','qc','social_media_admin'];
+function nextFor(role:string,state:WorkflowState):WorkflowState[] { if(role==='editor') return state==='Assigned'?['Editing']:state==='Editing'||state==='Amendment'||state==='Client Amendment'?['Submitted for Review']:[]; if(role==='client') return state==='Client Review'?['Client Amendment','Approved for Posting']:[]; return state==='Submitted for Review'?['Amendment','Manager Approved']:state==='Manager Approved'?['Client Review']:state==='Approved for Posting'?['Done']:[]; }
+export default function WorkflowBoard({ mode='manager' }:{mode?:'manager'|'editor'|'client'}) {
+ const [records,setRecords]=useState<WorkflowRecord[]>([]); const [metrics,setMetrics]=useState<any>(null); const [error,setError]=useState(''); const [selected,setSelected]=useState<string|null>(null); const [draft,setDraft]=useState<Record<string,string>>({});
+ const role=mode==='editor'?'editor':mode==='client'?'client':'manager';
+ async function load(){const r=await fetch('/api/workflow'); const j=await r.json(); if(r.ok){setRecords(j.records);setMetrics(j.metrics)}else setError(j.error||'Unable to load workflow');}
+ useEffect(()=>{load()},[]);
+ const current=records.find(r=>r.taskId===selected)||records[0];
+ async function act(taskId:string, payload:any){setError(''); const r=await fetch('/api/workflow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({taskId,...payload})}); const j=await r.json(); if(!r.ok){setError(j.error||'Action failed');return} await load(); setSelected(taskId);}
+ const title=mode==='client'?'Client Reviews':mode==='editor'?'Editor Workflow':'Manager Workflow';
+ return <AppShell sectionLabel={mode==='client'?'Client Portal':'Internal Ops'} sideTitle={title} sideCopy="One workflow from assignment to posting. External integrations report pending/unconfigured instead of claiming success.">
+  <div className="topbar"><div className="crumb">Workflow / <b>{title}</b></div><Link className="btn small outline" href="/internal/workflow">Process guide</Link></div>
+  {error&&<div style={{background:'#fff1f0',color:'#b42318',padding:10,borderRadius:8,marginBottom:12}}>{error}</div>}
+  {metrics&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>{[['Tasks',metrics.total],['Amendments',metrics.amendments],['Editor completed',metrics.editorCompleted],['Early',metrics.early],['Deadline day',metrics.deadlineDay],['Late',metrics.late]].map(([l,v])=><div key={String(l)} className="panel" style={{padding:'10px 14px',minWidth:100}}><b style={{fontSize:20}}>{v}</b><div style={{fontSize:11,color:'var(--muted)'}}>{l}</div></div>)}</div>}
+  <div style={{display:'grid',gridTemplateColumns:'minmax(260px, .8fr) minmax(320px,1.2fr)',gap:14}}>
+   <div className="panel" style={{padding:0,overflow:'hidden'}}><div style={{padding:12,borderBottom:'1px solid var(--line)',fontWeight:700}}>Content pipeline</div>{records.length===0?<p style={{padding:16,color:'var(--muted)'}}>No mirrored project tasks found.</p>:records.map(r=><button key={r.taskId} onClick={()=>setSelected(r.taskId)} style={{display:'block',width:'100%',textAlign:'left',border:0,borderBottom:'1px solid var(--line)',background:current?.taskId===r.taskId?'#f0f5ff':'#fff',padding:12,cursor:'pointer'}}><b>{r.title}</b><div style={{fontSize:12,color:'var(--muted)',marginTop:4}}>{r.clientName} · {r.editorName||'Unassigned'}</div><span style={{display:'inline-block',marginTop:6,padding:'3px 8px',borderRadius:99,background:'#e0e7ff',fontSize:11}}>{r.state}</span></button>)}</div>
+   {current?<Detail record={current} role={role} draft={draft} setDraft={setDraft} act={act}/>:<div className="panel" style={{padding:18}}>Select content to manage its workflow.</div>}
+  </div>
+ </AppShell>
+}
+function Detail({record:r,role,draft,setDraft,act}:{record:WorkflowRecord;role:string;draft:Record<string,string>;setDraft:React.Dispatch<React.SetStateAction<Record<string,string>>>;act:(id:string,p:any)=>Promise<void>}){
+ const set=(k:string,v:string)=>setDraft(d=>({...d,[k]:v})); const next=nextFor(role,r.state);
+ return <div className="panel" style={{padding:18}}><h1 style={{marginTop:0,fontSize:22}}>{r.title}</h1><p style={{color:'var(--muted)',marginTop:0}}>{r.clientName} · Editor: {r.editorName||'Unassigned'} · Deadline: {r.deadline||'Not set'}</p>
+  <div style={{display:'flex',flexWrap:'wrap',gap:5,margin:'14px 0'}}>{states.map((s,i)=><span key={s} style={{fontSize:10,padding:'4px 7px',borderRadius:99,background:s===r.state?'#173b73':i<states.indexOf(r.state)?'#e7f6ec':'#f2f4f7',color:s===r.state?'#fff':'#667085'}}>{s}</span>)}</div>
+  {role==='manager'&&<><label style={label}>Assign editor<input style={input} value={draft.editorName??r.editorName} onChange={e=>set('editorName',e.target.value)} placeholder="Editor name"/></label><label style={label}>Deadline<input style={input} type="date" value={draft.deadline??(r.deadline||'').slice(0,10)} onChange={e=>set('deadline',e.target.value)}/></label><button className="btn small" onClick={()=>act(r.taskId,{action:'assign',editorName:draft.editorName??r.editorName,deadline:draft.deadline??r.deadline})}>Save assignment</button></>}
+  {(role==='editor'||role==='manager')&&<label style={label}>Output video link<input style={input} type="url" value={draft.outputVideoUrl??r.outputVideoUrl} onChange={e=>set('outputVideoUrl',e.target.value)} placeholder="https://drive.google.com/..."/></label>}
+  {role==='manager'&&<><label style={label}>Hook<input style={input} value={draft.hook??r.hook} onChange={e=>set('hook',e.target.value)}/></label><label style={label}>Caption<textarea style={input} value={draft.caption??r.caption} onChange={e=>set('caption',e.target.value)}/></label></>}
+  {(role==='manager'||role==='editor'||role==='client')&&<><label style={label}>Comment<textarea style={input} value={draft.body||''} onChange={e=>set('body',e.target.value)} placeholder="Add context or amendment notes"/></label><button className="btn small outline" onClick={()=>{act(r.taskId,{action:'comment',body:draft.body,visibility:role==='client'?'client':'internal'});set('body','')}}>Add comment</button></>}
+  {role==='client'&&<div style={{margin:'14px 0',padding:10,borderRadius:8,background:'#f7f8fa'}}><b>{3-r.clientAmendmentTokensUsed} comment rounds remaining</b><div style={{fontSize:12,color:'var(--muted)'}}>Client amendment requests are capped at exactly three.</div></div>}
+  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16}}>{next.map(s=><button key={s} className={`btn small ${s.includes('Amendment')?'outline':''}`} onClick={()=>act(r.taskId,{state:s,outputVideoUrl:draft.outputVideoUrl??r.outputVideoUrl,hook:draft.hook??r.hook,caption:draft.caption??r.caption})}>{s==='Client Amendment'?'Request amendment':s}</button>)}{role==='manager'&&r.state==='Client Review'&&<button className="btn small outline" onClick={()=>act(r.taskId,{action:'notify_client'})}>Notify client</button>}{role==='manager'&&r.state==='Approved for Posting'&&<button className="btn small" onClick={()=>act(r.taskId,{action:'sync_posting',state:'Done'})}>Mark Done + sync</button>}</div>
+  {r.outputVideoUrl&&<p style={{fontSize:12,marginTop:14}}>Video: <a href={r.outputVideoUrl} target="_blank" rel="noreferrer">Open output</a></p>}
+  <h3 style={{fontSize:14,marginTop:20}}>Comments & history</h3>{r.comments.map(c=><div key={c.id} style={{padding:'8px 0',borderBottom:'1px solid var(--line)',fontSize:12}}><b>{c.authorName}</b> <span style={{color:'var(--muted)'}}>{c.authorRole}</span><div>{c.body}</div></div>)}{r.integrations.map((x,i)=><div key={i} style={{fontSize:12,marginTop:8}}>🔌 {x.integration}: <b>{x.status}</b> — {x.detail}</div>)}
+ </div>
+}
+const label:React.CSSProperties={display:'block',fontSize:12,fontWeight:600,color:'var(--muted)',margin:'10px 0'}; const input:React.CSSProperties={display:'block',width:'100%',boxSizing:'border-box',marginTop:4,padding:9,border:'1px solid var(--line)',borderRadius:7,fontFamily:'inherit'};
