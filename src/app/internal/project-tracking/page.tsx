@@ -25,7 +25,11 @@ interface ProjectTask {
 
 function fmtDate(d: string | null) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+  const date = new Date(`${d.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return d;
+  return [date.getDate(), date.getMonth() + 1, date.getFullYear()]
+    .map((part, index) => index < 2 ? String(part).padStart(2, '0') : String(part))
+    .join('-');
 }
 
 function statusPill(s: string) {

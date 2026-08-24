@@ -6,14 +6,14 @@ export interface WorkflowComment { id:string; authorName:string; authorRole:stri
 export interface WorkflowEvent { id:string; eventType:string; actorName:string; actorRole:string; fromState?:string; toState?:string; metadata?:Record<string,unknown>; createdAt:string }
 export interface WorkflowRecord { taskId:string; clientName:string; title:string; editorName:string; deadline:string|null; state:WorkflowState; outputVideoUrl:string; hook:string; caption:string; clientAmendmentTokensUsed:number; comments:WorkflowComment[]; events:WorkflowEvent[]; integrations:{integration:string;status:string;detail:string}[]; deliveryBucket:string|null; editorCompletedCount:number }
 
-type WorkflowTask = {id:string;client_name?:string;content_title?:string;video_editor?:string;deadline?:string|null};
+type WorkflowTask = {id:string;client_name?:string;content_title?:string;video_editor?:string;status?:string;deadline?:string|null};
 const id = () => crypto.randomUUID();
 
 /** Build a request-scoped record. Durable records must be loaded/saved by the API persistence layer. */
 export function workflowFromTask(task: WorkflowTask, persisted?: Partial<WorkflowRecord>): WorkflowRecord {
   return {
     taskId: task.id,
-    state: 'Assigned', outputVideoUrl: '', hook: '', caption: '',
+    state: task.status?.trim().toLowerCase() === 'done' ? 'Done' : 'Assigned', outputVideoUrl: '', hook: '', caption: '',
     clientAmendmentTokensUsed: 0, comments: [], events: [], integrations: [],
     deliveryBucket: null, editorCompletedCount: 0,
     ...persisted,

@@ -6,6 +6,11 @@ import type { WorkflowRecord, WorkflowState } from '@/lib/workflow-store';
 
 const states:WorkflowState[]=['Assigned','Editing','Submitted for Review','Amendment','Manager Approved','Client Review','Client Amendment','Approved for Posting','Done'];
 const managerRoles=['manager','project_manager','general_manager','admin','super_admin','qc','social_media_admin'];
+function fmtDate(value:string|null|undefined){
+ const raw=(value||'').slice(0,10); if(!raw) return 'Not set';
+ const [year,month,day]=raw.split('-');
+ return year&&month&&day?`${day}-${month}-${year}`:value||'Not set';
+}
 function nextFor(role:string,state:WorkflowState):WorkflowState[] { if(role==='editor') return state==='Assigned'?['Editing']:state==='Editing'||state==='Amendment'||state==='Client Amendment'?['Submitted for Review']:[]; if(role==='client') return state==='Client Review'?['Client Amendment','Approved for Posting']:[]; return state==='Submitted for Review'?['Amendment','Manager Approved']:state==='Manager Approved'?['Client Review']:state==='Approved for Posting'?['Done']:[]; }
 export default function WorkflowBoard({ mode='manager' }:{mode?:'manager'|'editor'|'client'}) {
  const [records,setRecords]=useState<WorkflowRecord[]>([]); const [metrics,setMetrics]=useState<any>(null); const [error,setError]=useState(''); const [selected,setSelected]=useState<string|null>(null); const [draft,setDraft]=useState<Record<string,string>>({});
@@ -27,7 +32,7 @@ export default function WorkflowBoard({ mode='manager' }:{mode?:'manager'|'edito
 }
 function Detail({record:r,role,draft,setDraft,act}:{record:WorkflowRecord;role:string;draft:Record<string,string>;setDraft:React.Dispatch<React.SetStateAction<Record<string,string>>>;act:(id:string,p:any)=>Promise<void>}){
  const set=(k:string,v:string)=>setDraft(d=>({...d,[k]:v})); const next=nextFor(role,r.state);
- return <div className="panel" style={{padding:18}}><h1 style={{marginTop:0,fontSize:22}}>{r.title}</h1><p style={{color:'var(--muted)',marginTop:0}}>{r.clientName} · Editor: {r.editorName||'Unassigned'} · Deadline: {r.deadline||'Not set'}</p>
+ return <div className="panel" style={{padding:18}}><h1 style={{marginTop:0,fontSize:22}}>{r.title}</h1><p style={{color:'var(--muted)',marginTop:0}}>{r.clientName} · Editor: {r.editorName||'Unassigned'} · Deadline: {fmtDate(r.deadline)}</p>
   <div style={{display:'flex',flexWrap:'wrap',gap:5,margin:'14px 0'}}>{states.map((s,i)=><span key={s} style={{fontSize:10,padding:'4px 7px',borderRadius:99,background:s===r.state?'#173b73':i<states.indexOf(r.state)?'#e7f6ec':'#f2f4f7',color:s===r.state?'#fff':'#667085'}}>{s}</span>)}</div>
   {role==='manager'&&<><label style={label}>Assign editor<input style={input} value={draft.editorName??r.editorName} onChange={e=>set('editorName',e.target.value)} placeholder="Editor name"/></label><label style={label}>Deadline<input style={input} type="date" value={draft.deadline??(r.deadline||'').slice(0,10)} onChange={e=>set('deadline',e.target.value)}/></label><button className="btn small" onClick={()=>act(r.taskId,{action:'assign',editorName:draft.editorName??r.editorName,deadline:draft.deadline??r.deadline})}>Save assignment</button></>}
   {(role==='editor'||role==='manager')&&<label style={label}>Output video link<input style={input} type="url" value={draft.outputVideoUrl??r.outputVideoUrl} onChange={e=>set('outputVideoUrl',e.target.value)} placeholder="https://drive.google.com/..."/></label>}
