@@ -39,14 +39,18 @@ function unavailableResponse(detail='Workflow persistence migration is not appli
 }
 
 async function loadRecords(sb:Supabase, rows:TaskRow[]) {
-  const items=await sb.from('workflow_items').select('*').in('task_id',rows.map(r=>r.id));
-  if(items.error) throw items.error;
-  const taskIds=rows.map(r=>r.id);
-  const [comments,events,integrations]=await Promise.all([
-    sb.from('workflow_comments').select('*').in('task_id',taskIds).order('created_at',{ascending:false}),
-    sb.from('workflow_events').select('*').in('task_id',taskIds).order('created_at',{ascending:false}),
-    sb.from('integration_events').select('*').in('task_id',taskIds).order('created_at',{ascending:false}),
+  // Do not send hundreds of task IDs through Supabase REST `.in(...)`: the
+  // resulting URL eventually exceeds the gateway limit (400 Bad Request).
+  // The task list is already bounded by project_tasks, so load workflow rows
+  // and restrict them to those task IDs in memory.
+  const taskIds = new Set(rows.map(r => r.id));
+  const [items, comments, events, integrations] = await Promise.all([
+    sb.from('workflow_items').select('*'),
+    sb.from('workflow_comments').select('*').order('created_at',{ascending:false}),
+    sb.from('workflow_events').select('*').order('created_at',{ascending:false}),
+    sb.from('integration_events').select('*').order('created_at',{ascending:false}),
   ]);
+  if(items.error) throw items.error;
   if(comments.error) throw comments.error; if(events.error) throw events.error; if(integrations.error) throw integrations.error;
   const byTask=new Map<string, any>(items.data.map((x:any)=>[x.task_id,x]));
   return rows.map(task=>{
