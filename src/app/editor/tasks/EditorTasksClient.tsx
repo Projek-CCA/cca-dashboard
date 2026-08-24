@@ -21,9 +21,8 @@ interface Task {
 
 function fmtDate(d: string | null) {
   if (!d) return '—';
-  const dt = new Date(d);
-  if (isNaN(dt.getTime())) return d;
-  return dt.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' });
+  const [year, month, day] = d.slice(0, 10).split('-');
+  return year && month && day ? `${day}-${month}-${year}` : d;
 }
 
 function statusStyle(s: string): React.CSSProperties {
