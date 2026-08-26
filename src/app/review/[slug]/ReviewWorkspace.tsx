@@ -5,229 +5,136 @@ import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { Button } from '@/components/Button';
 import { StatusPill } from '@/components/StatusPill';
-import type { ActivityItem, Comment, ContentItem, ContentStatus, Visibility } from '@/lib/types';
-import type { ReviewDecision, ReviewRecord } from '@/lib/review-store';
-import { deriveStatus } from '@/lib/review-store';
 import { useAuth } from '@/lib/auth-context';
+import type { WorkflowComment, WorkflowRecord, WorkflowState } from '@/lib/workflow-store';
 
-const navItems = [
-  { href: '/calendar', label: 'Content Calendar' },
-  { href: '/review/content-scaling-mistakes', label: 'Client Reviews', active: true },
-  { href: '/calendar', label: 'Approved Outputs' },
-  { href: '/internal/review-queue', label: 'Internal Queue' },
-  { href: '/editor/tasks', label: 'Editor Tasks' },
-];
+const visibilityOptions = ['all', 'client', 'internal'] as const;
+type VisibilityFilter = typeof visibilityOptions[number];
 
-const visibilityOptions: Visibility[] = ['Client-visible', 'CCA internal only', 'Editor-visible amendment'];
-
-type Decision = ReviewDecision;
-
-type ReviewApiRecord = ReviewRecord;
-
-interface ReviewWorkspaceProps {
-  item: ContentItem;
+/** Convert only the supported Google Drive sharing URL shapes to a safe preview URL. */
+export function drivePreviewUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !['drive.google.com', 'www.drive.google.com'].includes(url.hostname)) return null;
+    let id = url.pathname.match(/^\/file\/d\/([^/]+)(?:\/|$)/)?.[1] || null;
+    if (!id && url.pathname === '/open') id = url.searchParams.get('id');
+    if (!id) return null;
+    if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
+    return `https://drive.google.com/file/d/${id}/preview`;
+  } catch { return null; }
 }
 
-export function ReviewWorkspace({ item }: ReviewWorkspaceProps) {
+function validTimestamp(value: string) {
+  const match = value.trim().match(/^(\d{1,3}):([0-5]\d)$/);
+  return Boolean(match);
+}
+
+function timestampSeconds(value: string) {
+  const [minutes, seconds] = value.split(':').map(Number);
+  return minutes * 60 + seconds;
+}
+
+function displayDate(value: string | null | undefined) {
+  if (!value) return 'No deadline set';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function commentVisibility(comment: WorkflowComment) {
+  return comment.visibility === 'client' || comment.visibility === 'client_visible' ? 'Client-visible' : 'CCA internal only';
+}
+
+export function ReviewWorkspace({ taskId }: { taskId: string }) {
   const { user } = useAuth();
-  const [comments, setComments] = useState<Comment[]>(item.comments);
-  const [commentBody, setCommentBody] = useState('');
-  const [timestamp, setTimestamp] = useState('00:42');
-  const [visibility, setVisibility] = useState<Visibility>('Client-visible');
-  const [decision, setDecision] = useState<Decision>('pending');
-  const [activity, setActivity] = useState<ActivityItem[]>(item.activity);
-  const [currentStatus, setCurrentStatus] = useState<ContentStatus>(item.status);
+  const [record, setRecord] = useState<WorkflowRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [body, setBody] = useState('');
+  const [timestamp, setTimestamp] = useState('00:00');
+  const [timestampError, setTimestampError] = useState('');
+  const [filter, setFilter] = useState<VisibilityFilter>(user?.role === 'client' ? 'client' : 'all');
+  const [visibility, setVisibility] = useState(user?.role === 'client' ? 'client' : 'internal');
   const [activeTab, setActiveTab] = useState<'comments' | 'approval' | 'activity'>('comments');
 
-  const clientVisibleComments = useMemo(() => comments.filter((comment) => comment.visibility === 'Client-visible').length, [comments]);
-  const [apiLoading, setApiLoading] = useState(false);
-
-  function applyRecord(record: ReviewApiRecord) {
-    setComments(record.comments);
-    setActivity(record.activity);
-    setDecision(record.decision);
-    setCurrentStatus(record.status);
+  async function load() {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/workflow');
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Unable to load this review');
+      const found = (json.records as WorkflowRecord[]).find(item => item.taskId === taskId);
+      if (!found) throw new Error('This review is not available to your account.');
+      setRecord(found); setError('');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load this review'); }
+    finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    let ignore = false;
-    fetch(`/api/reviews/${item.slug}`)
-      .then((response) => response.ok ? response.json() : null)
-      .then((record: ReviewApiRecord | null) => {
-        if (!ignore && record) applyRecord(record);
-      })
-      .catch(() => undefined);
-    return () => { ignore = true; };
-  }, [item.slug]);
+  useEffect(() => { void load(); }, [taskId]);
+  useEffect(() => { if (user?.role === 'client') { setFilter('client'); setVisibility('client'); } }, [user?.role]);
+
+  const previewUrl = drivePreviewUrl(record?.outputVideoUrl);
+  const comments = useMemo(() => (record?.comments || []).filter(comment => filter === 'all' || (filter === 'client' ? commentVisibility(comment) === 'Client-visible' : commentVisibility(comment) !== 'Client-visible')), [record, filter]);
+  const quickTimestamps = useMemo(() => Array.from(new Set(['00:00', '00:15', '00:30', '01:00', ...(record?.comments || []).map(comment => comment.timestamp || '')].filter(Boolean))).slice(0, 6), [record]);
+
+  function chooseTimestamp(value: string) {
+    if (!validTimestamp(value)) { setTimestampError('Use mm:ss, with seconds from 00 to 59.'); return; }
+    setTimestamp(value.padStart(5, '0')); setTimestampError('');
+    // Drive is cross-origin, so the parent cannot seek its player. Keep the control
+    // explicit and focus the embed so the reviewer can seek with Drive's controls.
+    document.querySelector<HTMLIFrameElement>('.review-drive-frame')?.focus();
+  }
+
+  async function act(payload: Record<string, string>) {
+    if (!record || saving) return;
+    setSaving(true); setError('');
+    try {
+      const response = await fetch('/api/workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId, ...payload }) });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Action failed');
+      setRecord(json.record as WorkflowRecord);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Action failed'); }
+    finally { setSaving(false); }
+  }
 
   async function addComment() {
-    if (!commentBody.trim() || apiLoading) return;
-    const pendingBody = commentBody.trim();
-    setCommentBody('');
-    setApiLoading(true);
-    setActiveTab('comments');
-    const response = await fetch(`/api/reviews/${item.slug}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add_comment', body: pendingBody, timestamp: timestamp.trim() || '00:00', visibility }),
-    });
-    if (response.ok) applyRecord(await response.json() as ReviewApiRecord);
-    setApiLoading(false);
+    if (!body.trim()) return;
+    if (!validTimestamp(timestamp)) { setTimestampError('Use mm:ss, with seconds from 00 to 59.'); return; }
+    await act({ action: 'comment', body: body.trim(), visibility, timestamp });
+    setBody('');
   }
 
-  async function approveVideo() {
-    setApiLoading(true);
-    const response = await fetch(`/api/reviews/${item.slug}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'set_decision', decision: 'approved' }),
-    });
-    if (response.ok) applyRecord(await response.json() as ReviewApiRecord);
-    else {
-      setDecision('approved');
-      setCurrentStatus(deriveStatus('approved', item.status));
-    }
-    setApiLoading(false);
-    setActiveTab('approval');
-  }
+  if (loading) return <AppShell sectionLabel="Review" sideTitle="Video review" sideCopy="Loading review data…"><div className="review-empty-state panel">Loading review…</div></AppShell>;
+  if (!record) return <ReviewNotFound message={error || 'Review not found'} />;
+  const isClient = user?.role === 'client';
+  const decisionLabel = record.state === 'Approved for Posting' ? 'Approved for posting' : record.state === 'Client Amendment' || record.state === 'Amendment' ? 'Amendments requested' : 'Awaiting decision';
+  const nextActions = isClient ? (record.state === 'Client Review' ? [{ label: 'Request amendment', state: 'Client Amendment' }, { label: 'Approve video', state: 'Approved for Posting' }] : []) : record.state === 'Submitted for Review' ? [{ label: 'Request amendments', state: 'Amendment' }, { label: 'Approve video', state: 'Manager Approved' }] : [];
 
-  async function requestAmendments() {
-    setApiLoading(true);
-    const response = await fetch(`/api/reviews/${item.slug}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'set_decision', decision: 'amendments_requested' }),
-    });
-    if (response.ok) applyRecord(await response.json() as ReviewApiRecord);
-    else {
-      setDecision('amendments_requested');
-      setCurrentStatus(deriveStatus('amendments_requested', item.status));
-    }
-    setApiLoading(false);
-    setActiveTab('approval');
-  }
-
-  // Block client access to content that doesn't belong to them
-  if (user?.role === 'client' && user?.client_id && item.clientId !== user.client_id) {
-    return (
-      <main className="not-found">
-        <section className="panel">
-          <h1>Access denied</h1>
-          <p>You do not have permission to view this content.</p>
-          <Link className="btn primary" href="/calendar">Back to calendar</Link>
-        </section>
-      </main>
-    );
-  }
-
-  return (
-    <AppShell
-      sectionLabel="Workspace"
-      navItems={navItems}
-      sideTitle="Functional MVP"
-      sideCopy="This version now has API-backed mock behavior: add timestamp comments, approve, request amendments, and update the visible status."
-    >
-      <div className="topbar">
-        <div className="crumb">Clients / <b>Munif Isa</b> / January 2026 / Video Review</div>
-        <div className="top-actions"><Button>Copy review link</Button><Button variant="primary">Open Drive file</Button></div>
+  return <AppShell sectionLabel={isClient ? 'Client Portal' : 'Internal Ops'} sideTitle="Video review" sideCopy="Review the Drive preview, leave timestamped notes, and record a decision." navItems={[{ href: '/client/reviews', label: 'Client Reviews', active: isClient }, { href: '/internal/review-queue', label: 'Review Queue', active: !isClient }]}>
+    <div className="topbar"><div className="crumb">Reviews / <b>{record.clientName}</b> / {record.title}</div>{previewUrl && <a className="btn small outline" href={record.outputVideoUrl} target="_blank" rel="noreferrer">Open Drive file</a>}</div>
+    {error && <div className="review-error" role="alert">{error}</div>}
+    <section className="video-review-layout">
+      <div className="panel video-review-main">
+        <div className="review-heading"><div><h1>{record.title}</h1><div className="review-meta"><StatusPill label={record.state} /><span>{record.clientName}</span><span>Deadline: {displayDate(record.deadline)}</span></div></div><span className={`decision-badge ${decisionLabel.includes('Approved') ? 'approved' : decisionLabel.includes('Amend') ? 'amendments' : ''}`}>{decisionLabel}</span></div>
+        <div className="drive-player" aria-label={previewUrl ? 'Google Drive video preview' : 'Video preview unavailable'}>{previewUrl ? <iframe className="review-drive-frame" title={`Video preview: ${record.title}`} src={previewUrl} allow="autoplay; fullscreen" allowFullScreen /> : <div className="review-video-empty"><strong>Video preview unavailable</strong><span>The editor has not added a valid Google Drive output link yet.</span></div>}</div>
+        <div className="timestamp-help"><strong>Timestamped review</strong><span>Enter the point you want to discuss. Drive preview controls handle playback and seeking; its cross-origin player does not expose the current time to this page.</span></div>
+        <div className="quick-timestamps">{quickTimestamps.map(time => <button type="button" key={time} className={timestamp === time ? 'active' : ''} onClick={() => chooseTimestamp(time)}>Use {time}</button>)}</div>
+        <dl className="review-details"><div><dt>Client</dt><dd>{record.clientName}</dd></div><div><dt>Assigned editor</dt><dd>{record.editorName || 'Not assigned'}</dd></div><div><dt>Hook</dt><dd>{record.hook || 'Not provided'}</dd></div><div><dt>Caption</dt><dd>{record.caption || 'Not provided'}</dd></div></dl>
       </div>
-      <section className="review-layout">
-        <div className="panel">
-          <div className="header">
-            <div>
-              <h1>{item.title}</h1>
-              <div className="meta">
-                <StatusPill label={currentStatus} />
-                <span className="pill">Posting: Jan 12, 2026</span>
-                <span className="pill">{clientVisibleComments} client-visible comments</span>
-              </div>
-            </div>
-            <span className={`decision-badge ${decision === 'amendments_requested' ? 'amendments' : decision}`}>{decision === 'pending' ? 'Awaiting decision' : decision === 'approved' ? 'Approved' : 'Amendments requested'}</span>
-          </div>
-          <div className="video-wrap">
-            <div className="drive-video" aria-label="Google Drive embed placeholder">
-              <div className="timeline"><span /></div>
-              <div className="marker m1" /><div className="marker m2" /><div className="marker m3" />
-              <button className="play" type="button" onClick={() => setTimestamp('00:42')}><span>▶</span></button>
-              <div className="video-caption"><small>Google Drive embed-ready preview</small><strong>{timestamp} / {item.duration}</strong></div>
-            </div>
-          </div>
-          <div className="quick-timestamps">
-            {['00:18', '00:42', '01:12'].map((time) => <button className={timestamp === time ? 'active' : ''} key={time} onClick={() => setTimestamp(time)} type="button">Use {time}</button>)}
-          </div>
-          <div className="content-body">
-            <div className="field"><label>Client</label><p>Munif Isa / Sixma</p></div>
-            <div className="field"><label>Assigned editor</label><p>{item.editor}</p></div>
-            <div className="field"><label>Content category</label><p>{item.category}</p></div>
-            <div className="field"><label>Status after approval</label><p>Pending Hook & Caption → Ready to Post</p></div>
-            <div className="field wide"><label>Content brief</label><p>{item.brief}</p></div>
-            <div className="field wide"><label>Hook / Caption</label><p><b>Hook:</b> {item.hook}. <br /><b>Caption:</b> {item.caption}</p></div>
-          </div>
-        </div>
-        <div className="panel">
-          <div className="tabs">
-            <button className={`tab ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => setActiveTab('comments')}>Comments</button>
-            <button className={`tab ${activeTab === 'approval' ? 'active' : ''}`} onClick={() => setActiveTab('approval')}>Approval</button>
-            <button className={`tab ${activeTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveTab('activity')}>Activity</button>
-          </div>
-          {activeTab === 'comments' ? (
-            <>
-              <div className="comment-list">
-                {comments.map((comment) => (
-                  <div className={`comment ${comment.visibility === 'CCA internal only' ? 'internal' : ''}`} key={comment.id}>
-                    <div className="comment-head">
-                      <div className="who"><div className="avatar">{comment.initials}</div><div><strong>{comment.author}</strong><small>{comment.role} · {comment.createdAt}</small></div></div>
-                      <button className="timecode" type="button" onClick={() => setTimestamp(comment.timestamp)}>{comment.timestamp}</button>
-                    </div>
-                    <p>{comment.body}</p>
-                    <div className="visibility">{comment.visibility === 'CCA internal only' ? '🔒' : comment.visibility === 'Editor-visible amendment' ? '🛠️' : '👁'} {comment.visibility}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="composer">
-                <div className="composer-grid">
-                  <input className="select" value={timestamp} onChange={(event) => setTimestamp(event.target.value)} aria-label="Timestamp" />
-                  <select className="select" value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>{visibilityOptions.map((option) => <option key={option}>{option}</option>)}</select>
-                </div>
-                <textarea placeholder="Write a timestamped comment…" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} />
-                <div className="composer-row"><small>Comment will be attached to {timestamp}</small><Button variant="primary" onClick={addComment}>Add comment</Button></div>
-              </div>
-            </>
-          ) : null}
-          {activeTab === 'approval' ? (
-            <div className="approval-state">
-              <h2>Approval decision</h2>
-              <p>Current state: <b>{decision === 'pending' ? 'Waiting for client decision' : decision === 'approved' ? 'Approved by client' : 'Amendments requested by client'}</b></p>
-              <p>Next operational status: <b>{currentStatus}</b></p>
-              <div className="decision"><Button variant="danger" onClick={requestAmendments} disabled={apiLoading}>Request amendments</Button><Button variant="green" onClick={approveVideo} disabled={apiLoading}>Approve video</Button></div>
-            </div>
-          ) : null}
-          {activeTab === 'activity' ? (
-            <div className="activity padless">
-              {activity.map((event) => <div className="event" key={event.id}><div className="icon">{event.icon}</div><div><p>{event.text}</p><small>{event.time}</small></div></div>)}
-            </div>
-          ) : null}
-          {activeTab !== 'approval' ? <div className="decision"><Button variant="danger" onClick={requestAmendments}>Request amendments</Button><Button variant="green" onClick={approveVideo}>Approve video</Button></div> : null}
-        </div>
-        <div className="panel pad">
-          <div className="activity">
-            <h2>Approval trail</h2>
-            {activity.map((event) => <div className="event" key={event.id}><div className="icon">{event.icon}</div><div><p>{event.text}</p><small>{event.time}</small></div></div>)}
-          </div>
-        </div>
-      </section>
-    </AppShell>
-  );
+      <aside className="panel video-review-sidebar">
+        <div className="review-tabs">{(['comments', 'approval', 'activity'] as const).map(tab => <button type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)} key={tab}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
+        {activeTab === 'comments' && <><div className="comment-filter"><label htmlFor="comment-filter">Show</label><select id="comment-filter" value={filter} onChange={event => setFilter(event.target.value as VisibilityFilter)}><option value="all">All comments</option><option value="client">Client-visible</option><option value="internal">Internal</option></select></div><div className="comment-list">{comments.length ? comments.map(comment => <article className="review-comment" key={comment.id}><div className="comment-head"><div><strong>{comment.authorName}</strong><small>{comment.authorRole} · {displayDate(comment.createdAt)}</small></div><button type="button" className="timecode" onClick={() => chooseTimestamp(comment.timestamp || '00:00')}>{comment.timestamp || '00:00'}</button></div><p>{comment.body}</p><span className="visibility-label">{commentVisibility(comment)}</span></article>) : <div className="review-empty-state">No comments in this view yet.</div>}</div><div className="composer"><div className="composer-grid"><div><label htmlFor="review-timestamp">Timestamp</label><input id="review-timestamp" inputMode="numeric" value={timestamp} aria-invalid={Boolean(timestampError)} onChange={event => { setTimestamp(event.target.value); setTimestampError(''); }} onBlur={() => { if (!validTimestamp(timestamp)) setTimestampError('Use mm:ss, with seconds from 00 to 59.'); }} /><small>{timestampError || 'mm:ss'}</small></div><div><label htmlFor="review-visibility">Visibility</label><select id="review-visibility" value={visibility} onChange={event => setVisibility(event.target.value)} disabled={isClient}><option value="client">Client-visible</option><option value="internal">CCA internal only</option></select></div></div><textarea value={body} onChange={event => setBody(event.target.value)} placeholder="Write a timestamped comment…" aria-label="Comment" /><div className="composer-row"><span>Attached to {timestamp || '00:00'}</span><Button variant="primary" onClick={addComment} disabled={saving || !body.trim()}>Add comment</Button></div></div></>}
+        {activeTab === 'approval' && <div className="approval-state"><h2>Decision</h2><p>Current workflow state: <b>{record.state}</b></p><div className="decision">{nextActions.length ? nextActions.map(action => <Button key={action.state} variant={action.state.includes('Amendment') ? 'danger' : 'green'} onClick={() => act({ state: action.state })} disabled={saving}>{action.label}</Button>) : <span className="muted">No decision is available at this stage.</span>}</div></div>}
+        {activeTab === 'activity' && <div className="activity padless">{record.events.length ? record.events.map(event => <div className="event" key={event.id}><div className="icon">{event.toState ? '↗' : '•'}</div><div><p>{event.actorName} moved this to {event.toState || event.eventType}</p><small>{displayDate(event.createdAt)}</small></div></div>) : <div className="review-empty-state">No activity recorded yet.</div>}</div>}
+        {activeTab !== 'approval' && nextActions.length > 0 && <div className="decision"><Button variant="danger" onClick={() => act({ state: nextActions[0].state })} disabled={saving}>{nextActions[0].label}</Button><Button variant="green" onClick={() => act({ state: nextActions[1].state })} disabled={saving}>{nextActions[1].label}</Button></div>}
+      </aside>
+    </section>
+  </AppShell>;
 }
 
-export function ReviewNotFound() {
-  return (
-    <main className="not-found">
-      <section className="panel">
-        <h1>Review not found</h1>
-        <p>This mock review does not exist yet.</p>
-        <Link className="btn primary" href="/calendar">Back to calendar</Link>
-      </section>
-    </main>
-  );
+export function ReviewNotFound({ message = 'This review could not be found.' }: { message?: string }) {
+  return <main className="not-found"><section className="panel"><h1>Review unavailable</h1><p>{message}</p><Link className="btn primary" href="/client/reviews">Back to reviews</Link></section></main>;
 }
+
+export { timestampSeconds };

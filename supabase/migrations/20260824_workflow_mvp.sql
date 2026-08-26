@@ -22,6 +22,7 @@ create table if not exists workflow_comments (
   author_role text not null,
   body text not null,
   visibility text not null default 'internal',
+  timestamp text,
   created_at timestamptz not null default now()
 );
 create table if not exists workflow_events (
@@ -45,3 +46,4 @@ create table if not exists integration_events (
 );
 create index if not exists workflow_events_task_idx on workflow_events(task_id, created_at desc);
 create index if not exists workflow_comments_task_idx on workflow_comments(task_id, created_at desc);
+alter table workflow_comments add column if not exists timestamp text;

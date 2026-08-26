@@ -2,7 +2,7 @@ import { canTransition, clientAmendmentAllowed, deliveryBucket } from './workflo
 
 export type WorkflowState = 'Assigned'|'Editing'|'Submitted for Review'|'Amendment'|'Manager Approved'|'Client Review'|'Client Amendment'|'Approved for Posting'|'Done';
 export type WorkflowRole = 'manager'|'project_manager'|'general_manager'|'admin'|'super_admin'|'qc'|'social_media_admin'|'editor'|'client';
-export interface WorkflowComment { id:string; authorName:string; authorRole:string; body:string; visibility:string; createdAt:string }
+export interface WorkflowComment { id:string; authorName:string; authorRole:string; body:string; visibility:string; createdAt:string; timestamp?:string }
 export interface WorkflowEvent { id:string; eventType:string; actorName:string; actorRole:string; fromState?:string; toState?:string; metadata?:Record<string,unknown>; createdAt:string }
 export interface WorkflowRecord { taskId:string; clientName:string; title:string; editorName:string; deadline:string|null; state:WorkflowState; outputVideoUrl:string; hook:string; caption:string; clientAmendmentTokensUsed:number; comments:WorkflowComment[]; events:WorkflowEvent[]; integrations:{integration:string;status:string;detail:string}[]; deliveryBucket:string|null; editorCompletedCount:number }
 
@@ -25,18 +25,18 @@ export function workflowFromTask(task: WorkflowTask, persisted?: Partial<Workflo
   };
 }
 
-export function addCommentToRecord(record: WorkflowRecord, input:{body:string;authorName:string;authorRole:string;visibility?:string}) {
+export function addCommentToRecord(record: WorkflowRecord, input:{body:string;authorName:string;authorRole:string;visibility?:string;timestamp?:string}) {
   record.comments.unshift({id:id(), ...input, visibility:input.visibility || 'internal', createdAt:new Date().toISOString()});
   return record;
 }
 
-export function applyWorkflowUpdate(record: WorkflowRecord, input:{role:WorkflowRole;actorName:string;action:string;state?:WorkflowState;outputVideoUrl?:string;editorName?:string;deadline?:string;hook?:string;caption?:string;body?:string;visibility?:string}) {
+export function applyWorkflowUpdate(record: WorkflowRecord, input:{role:WorkflowRole;actorName:string;action:string;state?:WorkflowState;outputVideoUrl?:string;editorName?:string;deadline?:string;hook?:string;caption?:string;body?:string;visibility?:string;timestamp?:string}) {
   if (input.outputVideoUrl !== undefined) record.outputVideoUrl = input.outputVideoUrl;
   if (input.editorName !== undefined) record.editorName = input.editorName;
   if (input.deadline !== undefined) record.deadline = input.deadline;
   if (input.hook !== undefined) record.hook = input.hook;
   if (input.caption !== undefined) record.caption = input.caption;
-  if (input.body) addCommentToRecord(record, {body:input.body, authorName:input.actorName, authorRole:input.role, visibility:input.visibility});
+  if (input.body) addCommentToRecord(record, {body:input.body, authorName:input.actorName, authorRole:input.role, visibility:input.visibility, timestamp:input.timestamp});
   if (input.action === 'request_client_amendment' && !clientAmendmentAllowed(record.clientAmendmentTokensUsed)) throw new Error('Client amendment limit reached (3 of 3 used)');
   if (input.action === 'notify_client') record.integrations.unshift({integration:'email', status:process.env.EMAIL_PROVIDER ? 'pending' : 'unconfigured', detail:process.env.EMAIL_PROVIDER ? 'Provider adapter queued' : 'No email provider configured; notification recorded only'});
   if (input.action === 'sync_posting') {
