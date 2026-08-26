@@ -64,7 +64,7 @@ export default function DashboardPage() {
     }
   }
 
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super_admin';
 
   return (
     <AppShell

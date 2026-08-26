@@ -112,6 +112,9 @@ export async function POST(request: Request) {
     // Determine redirect based on role
     const redirectMap: Record<string, string> = {
       admin: '/dashboard',
+      super_admin: '/dashboard',
+      general_manager: '/dashboard',
+      manager: '/dashboard',
       project_manager: '/dashboard',
       qc: '/qc',
       editor: '/editor/tasks',
