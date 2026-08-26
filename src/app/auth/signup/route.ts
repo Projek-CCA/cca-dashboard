@@ -9,9 +9,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'email, password, name, and role are required' }, { status: 400 });
     }
 
-    const validRoles = ['admin', 'project_manager', 'qc', 'editor', 'client'];
+    const validRoles = ['super_admin', 'admin', 'manager', 'project_manager', 'general_manager', 'qc', 'editor', 'client'];
     if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role. Must be: admin, project_manager, qc, editor, or client' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid role. Must be: super_admin, admin, manager, project_manager, general_manager, qc, editor, or client' }, { status: 400 });
     }
 
     const supabase = await createClient();
@@ -22,11 +22,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized — must be logged in as admin' }, { status: 401 });
     }
 
-    const { data: callerProfile } = await supabase
+    let { data: callerProfile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', caller.id)
       .maybeSingle();
+    if (!callerProfile && caller.email) {
+      callerProfile = (await supabase
+        .from('profiles')
+        .select('role')
+        .eq('email', caller.email)
+        .maybeSingle()).data;
+    }
 
     if (!['admin', 'super_admin'].includes(callerProfile?.role || '')) {
       return NextResponse.json({ error: 'Only admins can create users' }, { status: 403 });

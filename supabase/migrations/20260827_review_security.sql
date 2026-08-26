@@ -80,76 +80,89 @@ alter table review_records enable row level security;
 alter table review_comments enable row level security;
 alter table review_decisions enable row level security;
 
--- Profile roles are the repo's existing ownership/authorization source.
+-- Resolve the current profile by auth ID, with an email fallback for this project's
+-- legacy profile records whose primary key may not equal auth.uid().
+create or replace function cca_current_profile()
+returns table(id uuid, name text, role text, client_id uuid)
+language sql stable security definer set search_path = public
+as $$
+  select p.id, p.name, p.role, p.client_id
+  from profiles p
+  where p.id = auth.uid()
+     or lower(coalesce(p.email, '')) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  order by (p.id = auth.uid()) desc
+  limit 1
+$$;
+
 create policy workflow_items_staff_or_assigned on workflow_items for select to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id::text = workflow_items.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id::text = workflow_items.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')
       or (p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')))
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
 create policy workflow_items_staff_write on workflow_items for all to authenticated using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')))
-with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
+  exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')))
+with check (exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
 create policy workflow_items_assigned_editor_write on workflow_items for all to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id::text = workflow_items.task_id
-    where p.id = auth.uid() and p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,''))))
-with check (exists (select 1 from profiles p join project_tasks t on t.id::text = workflow_items.task_id
-    where p.id = auth.uid() and p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,''))));
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id::text = workflow_items.task_id
+    where p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,''))))
+with check (exists (select 1 from cca_current_profile() p join project_tasks t on t.id::text = workflow_items.task_id
+    where p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,''))));
 
 create policy workflow_comments_visible_to_actor on workflow_comments for select to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id::text = workflow_comments.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id::text = workflow_comments.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')
       or (p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')) and visibility <> 'internal')
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name) and visibility = 'client_visible'))));
 create policy workflow_comments_staff_write on workflow_comments for insert to authenticated with check (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
+  exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
 create policy workflow_comments_assigned_editor_write on workflow_comments for insert to authenticated with check (
-  exists (select 1 from profiles p join project_tasks t on t.id::text = workflow_comments.task_id
-    where p.id = auth.uid() and p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')) and visibility <> 'internal'));
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id::text = workflow_comments.task_id
+    where p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')) and visibility <> 'internal'));
 create policy workflow_comments_client_write on workflow_comments for insert to authenticated with check (
-  exists (select 1 from profiles p join project_tasks t on t.id::text = workflow_comments.task_id
-    where p.id = auth.uid() and p.role = 'client' and visibility = 'client_visible'
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id::text = workflow_comments.task_id
+    where p.role = 'client' and visibility = 'client_visible'
       and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)));
 
 create policy workflow_events_visible_to_actor on workflow_events for select to authenticated using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
+  exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
 create policy workflow_events_staff_write on workflow_events for insert to authenticated with check (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
+  exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
 create policy integration_events_staff_only on integration_events for all to authenticated using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')))
-with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
+  exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')))
+with check (exists (select 1 from cca_current_profile() p where p.role in ('super_admin','admin','manager','project_manager','general_manager','qc','social_media_admin')));
 
 create policy review_records_visible_to_actor on review_records for select to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id = review_records.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_records.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager')
       or (p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')))
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
 create policy review_records_create_for_actor on review_records for insert to authenticated with check (
-  exists (select 1 from profiles p join project_tasks t on t.id = review_records.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_records.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager')
       or (p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')))
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
 create policy review_records_manage on review_records for update to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id = review_records.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_records.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager')
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name))))) with check (
-  exists (select 1 from profiles p join project_tasks t on t.id = review_records.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_records.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager')
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
 
 create policy review_comments_visible_to_actor on review_comments for select to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id = review_comments.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager')
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_comments.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager')
       or (p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')) and visibility <> 'internal')
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name) and visibility = 'client_visible'))));
 create policy review_comments_create_for_actor on review_comments for insert to authenticated with check (
-  author_profile_id = auth.uid() and exists (select 1 from profiles p join project_tasks t on t.id = review_comments.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager')
+  author_profile_id in (select id from cca_current_profile()) and exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_comments.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager')
       or (p.role = 'editor' and lower(coalesce(t.video_editor,'')) = lower(coalesce(p.name,'')) and visibility <> 'internal')
       or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name) and visibility = 'client_visible'))));
 
 create policy review_decisions_visible_to_actor on review_decisions for select to authenticated using (
-  exists (select 1 from profiles p join project_tasks t on t.id = review_decisions.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager') or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
+  exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_decisions.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager') or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
 create policy review_decisions_create_for_actor on review_decisions for insert to authenticated with check (
-  actor_profile_id = auth.uid() and exists (select 1 from profiles p join project_tasks t on t.id = review_decisions.task_id
-    where p.id = auth.uid() and (p.role in ('super_admin','admin','manager','project_manager','general_manager') or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
+  actor_profile_id in (select id from cca_current_profile()) and exists (select 1 from cca_current_profile() p join project_tasks t on t.id = review_decisions.task_id
+    where (p.role in ('super_admin','admin','manager','project_manager','general_manager') or (p.role = 'client' and exists (select 1 from clients c where c.id = p.client_id and c.name = t.client_name)))));
